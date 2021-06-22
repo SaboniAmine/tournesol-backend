@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'tournesol',
     'oauth2_provider',
     'rest_framework',
+    'ml',
 ]
 
 # Modèle utilisateur utilisé par Django (1.5+)
