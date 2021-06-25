@@ -11,11 +11,12 @@ def fetch_data():
     Returns:
     - comparison_data: list of [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str, score: float, weight: float]
     """
+    print("fetch")
     comparison_data = [
         [comparison.user_id, comparison.video_1_id, comparison.video_2_id, criteria, getattr(comparison, criteria), getattr(comparison, f"{criteria}_weight")]
         for comparison in Comparison.objects.all() for criteria in VIDEO_FIELDS
         if hasattr(comparison, criteria)]
-    
+    print(comparison_data)
     return comparison_data
 
 
@@ -30,6 +31,7 @@ def ml_run(comparison_data):
     # TODO: implement this method
     video_scores = [[1,"reliability", 1., 1.]]
     contributor_rating_scores = [[1, 1, "reliability", 1., 1.]]
+    
     return video_scores, contributor_rating_scores
 
 
@@ -47,3 +49,5 @@ class Command(BaseCommand):
         comparison_data = fetch_data()
         video_scores, contributor_rating_scores = ml_run(comparison_data)
         save_data(video_scores, contributor_rating_scores)
+
+print()

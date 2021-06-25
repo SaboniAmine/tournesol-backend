@@ -25,7 +25,7 @@ try:
     with open(SETTINGS_FILE, 'r') as f:
         server_settings = yaml.load(f, Loader=yaml.FullLoader)
 except FileNotFoundError:
-    print('No local settings.')
+    print('No local settings.--')
     pass
 
 # Quick-start development settings - unsuitable for production
@@ -106,7 +106,7 @@ DATABASES = OrderedDict([
         'USER': 'DATABASE_USER' in server_settings and server_settings['DATABASE_USER'] or 'postgres',
         'PASSWORD': 'DATABASE_PASSWORD' in server_settings and server_settings['DATABASE_PASSWORD'] or '',
         'HOST': "DATABASE_HOST" in server_settings and server_settings["DATABASE_HOST"] or 'localhost',
-        'PORT': 5432,
+        'PORT': 9000,
         'NUMBER': 42
     }]
 ])
