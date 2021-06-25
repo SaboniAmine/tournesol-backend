@@ -158,8 +158,14 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 OAUTH2_PROVIDER = {
-    # this is the list of available scopes
-    'SCOPES': {'read': 'Read scope', 'write': 'Write scope', 'groups': 'Access to your groups'}
+    "OIDC_ENABLED": "OIDC_ENABLED" in server_settings and server_settings["OIDC_ENABLED"] or False,
+    "OIDC_RSA_PRIVATE_KEY": "OIDC_RSA_PRIVATE_KEY" in server_settings and server_settings["OIDC_RSA_PRIVATE_KEY"] or 'dsfsdfdsfsdfsdfsdf',
+    "SCOPES": {
+        'openid': 'OpenID Connect scope',
+        'read': 'Read scope',
+        'write': 'Write scope',
+        'groups': 'Access to your groups',
+    },
 }
 
 REST_FRAMEWORK = {
