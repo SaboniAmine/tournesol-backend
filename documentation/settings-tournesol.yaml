@@ -17,6 +17,7 @@ MEDIA_ROOT: /home/user/media/
 EMAIL_BACKEND: console
 
 OIDC_ENABLED: true
+OIDC_ISS_ENDPOINT: https://localhost:8000/o
 # openssl genrsa 4096
 OIDC_RSA_PRIVATE_KEY: |
     -----BEGIN RSA PRIVATE KEY-----
