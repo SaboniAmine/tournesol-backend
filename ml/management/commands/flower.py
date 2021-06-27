@@ -2,9 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import numpy as np
 from copy import deepcopy
 from time import time
+
+from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
+from ml.management.commands.utilities import model_norm, round_loss, tens_count, node_local_loss
+from ml.management.commands.utilities import get_node_vids, get_all_vids
 
 def get_classifier(gpu=False):
     ''' returns linear baseline classifier '''
@@ -20,53 +23,6 @@ def get_classifier(gpu=False):
         return model.cuda()
     return model
 
-def fbbt(t,r):
-    ''' fbbt loss function '''
-    return torch.log(abs(torch.sinh(t)/t)) + r * t + torch.log(torch.tensor(2))
-
-def hfbbt(t,r):
-    ''' approximated fbbt loss function '''
-    if abs(t) <= 0.01:
-        return t**2 / 6 + r *t + torch.log(torch.tensor(2))
-    elif abs(t) < 10:
-        return torch.log(2 * torch.sinh(t) / t) + r * t
-    else:
-        return abs(t) - torch.log(abs(t)) + r * t
-
-def fit_loss(s, ya, yb, r):  
-    ''' loss for one comparison '''
-    loss = hfbbt(s * (ya - yb), r)   
-    return loss
-
-def s_loss(s):
-    ''' second term of local loss (for one node) '''
-    return (2 * s - torch.log(s))
-
-def node_local_loss(model, s, a_batch, b_batch, r_batch):
-    ''' fitting loss for one node, includes s_loss '''
-    ya_batch = model(a_batch.float())
-    yb_batch = model(b_batch.float())
-    loss = 0 
-    for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
-        loss += fit_loss(s, ya, yb, r)
-    return loss / len(a_batch) + s_loss(s)
-
-def get_node_vids(batch):
-    ''' creates a tensor containing IDs of videos rated by one user without repetition '''
-    ids = torch.unique(batch[:,:2])
-    batch_ids = torch.unsqueeze(ids,1)
-    return batch_ids
-
-def get_all_vids(l_vids):
-    ''' l_vids : list of batches of videos IDs (1 batch/node) '''
-    all_ids = torch.vstack(l_vids)
-    ids = torch.unique(all_ids)
-    batch_ids = torch.unsqueeze(ids,1)
-    return batch_ids
-
-
-
-
 # nodes organisation
 class Flower():
     ''' Training structure including local models and general one 
@@ -79,8 +35,7 @@ class Flower():
         .check
     '''
 
-    def __init__(self, #test, 
-                gpu=False, **kwargs):
+    def __init__(self, gpu=False, **kwargs):
         ''' opt : optimizer
             test : test data couple (imgs,labels)
             w0 : regularisation strength
@@ -215,51 +170,6 @@ class Flower():
         for ty in self.dic.keys():
             c[ty] = self.hm(ty)
         return c
-
-    # ------------- scoring methods -----------
-    def score_glob(self, datafull): 
-        ''' return accuracy provided images and GTs '''
-        return score(self.general_model, datafull)
-    
-    def test_loc(self, node):
-        ''' score of node on local test data '''
-        id_data = self.localtest[0][node]
-        if id_data == -1:
-            # print("No local test data")
-            return None
-        else:
-            nodetest = score(self.models[node], self.localtest[1][id_data])
-            return nodetest
-
-    def test_full(self, node):
-        ''' score of node on global test data '''
-        return score(self.models[node], self.d_test)
-
-    def test_train(self, node):
-        ''' score of node on its train data '''
-        return score(self.models[node], (self.data[node], self.labels[node]))
-
-    def display(self, node):
-        ''' display accuracy for selected node
-            node = -1 for global model
-        '''
-        if node == -1: # global model
-            print("global model")
-            print("accuracy on test data :", 
-                  self.score_glob(self.d_test))
-        else: # we asked for a node
-            loc_train = self.test_train(node)
-            loc_test = self.test_loc(node)
-            full_test = self.test_full(node)
-            print("node number :", node, ", dataset size :",
-                len(self.labels[node]), ", type :", self.typ[node], 
-                ", age :", self.age[node])
-            print("accuracy on local train data :", loc_train)
-            print("accuracy on local test data :", loc_test)
-            print("accuracy on global test data :", full_test)
-            repart = {str(k) : tens_count(self.labels[node], k) 
-                for k in range(10)}
-            print("labels repartition :", repart)
 
     def output_scores(self):
         ''' Returns video scores both local and global '''
@@ -450,60 +360,4 @@ def get_flower(gpu=False, **kwargs):
     return Flower( gpu=gpu, **kwargs)
 
 
-def extract_grad(model):
-    '''return list of gradients of a model'''
-    l_grad =  [p.grad for p in model.parameters()]
-    return l_grad
 
-def sp(l_grad1, l_grad2):
-    '''scalar product of 2 lists of gradients'''
-    s = 0
-    for g1, g2 in zip(l_grad1, l_grad2):
-        s += (g1 * g2).sum()
-    return round_loss(s, 4)
-
-def nb_params(model):
-    '''return number of parameters of a model'''
-    return sum(p.numel() for p in model.parameters())
-
-#loss and scoring functions 
-
-
-def models_dist(model_loc, model_glob, pow=(1,1)):  
-    ''' l1 distance between global and local parameter
-        will be mutliplied by w_n 
-        pow : (internal power, external power)
-    '''
-    q, p = pow
-    dist = sum(((theta - rho)**q).abs().sum() for theta, rho in 
-                  zip(model_loc.parameters(), model_glob.parameters()))**p
-    return dist
-
-def model_norm(model_glob, pow=(2,1)): 
-    ''' l2 squared regularisation of global parameter
-     will be multiplied by w_0 
-     pow : (internal power, external power)
-     '''
-    q, p = pow
-    norm = sum((param**q).abs().sum() for param in model_glob.parameters())**p
-    return norm
-
-def round_loss(tens, dec=0): 
-    '''from an input scalar tensor returns rounded integer'''
-    if type(tens)==int or type(tens)==float:
-        return round(tens, dec)
-    else:
-        return round(tens.item(), dec)
-
-def tens_count(tens, val):
-    ''' counts nb of -val in tensor -tens '''
-    return len(tens) - round_loss(torch.count_nonzero(tens-val))
-
-def score(model, datafull):
-    ''' returns accuracy provided models, images and GTs '''
-    out = model(datafull[0])
-    predictions = torch.max(out, 1)[1]
-    c=0
-    for a, b in zip(predictions, datafull[1]):
-        c += int(a==b)
-    return c/len(datafull[0])

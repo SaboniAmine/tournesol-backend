@@ -8,12 +8,12 @@ import numpy as np
 import torch
 from ml.management.commands.flower import get_flower
 
-CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
-                "layman_friendly", "diversity_inclusion", "backfire_risk", 
-                "better_habits", "entertaining_relaxing"]
+# CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
+#                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
+#                 "better_habits", "entertaining_relaxing"]
 
-#CRITERIAS = ["reliability"]
-EPOCHS = 10
+CRITERIAS = ["reliability"]
+EPOCHS = 50
 
 
 def fetch_data():
