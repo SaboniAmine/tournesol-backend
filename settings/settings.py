@@ -166,6 +166,8 @@ OAUTH2_PROVIDER = {
         'write': 'Write scope',
         'groups': 'Access to your groups',
     },
+    "OAUTH2_VALIDATOR_CLASS": "core.oauth_validator.CustomOAuth2Validator",
+    "OIDC_ISS_ENDPOINT": "OIDC_ISS_ENDPOINT" in server_settings and server_settings["OIDC_ISS_ENDPOINT"] or '',
 }
 
 REST_FRAMEWORK = {
