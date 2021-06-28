@@ -104,7 +104,7 @@ def in_and_out(comparison_data, criteria):
     Trains models and returns video scores
 
     comparison_data: output of fetch_data()
-    criteria: int, rating criteria
+    criteria: str, rating criteria
     
     Returns :   
     - (tensor of all vIDS , tensor of global video scores)
