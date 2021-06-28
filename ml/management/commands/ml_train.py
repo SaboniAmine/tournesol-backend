@@ -37,11 +37,11 @@ Usage:
 """
 
 # global variables
-# CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
-#                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
-#                 "better_habits", "entertaining_relaxing"]
+CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
+                "layman_friendly", "diversity_inclusion", "backfire_risk", 
+                "better_habits", "entertaining_relaxing"]
 
-CRITERIAS = ["reliability"]
+# CRITERIAS = ["reliability"]
 EPOCHS = 1
 
 
@@ -57,7 +57,6 @@ def fetch_data():
         [comparison.user_id, comparison.video_1_id, comparison.video_2_id, criteria, getattr(comparison, criteria), getattr(comparison, f"{criteria}_weight")]
         for comparison in Comparison.objects.all() for criteria in VIDEO_FIELDS
         if hasattr(comparison, criteria)]
-   # print(comparison_data)
     return comparison_data
 
 def select_criteria(comparison_data, crit):
@@ -81,43 +80,22 @@ def shape_data(l_ratings):
     arr = np.asarray(l_cleared)
     return arr
 
-# def distribute_data(arr, gpu=False):
-#     ''' 
-#     Distributes data on nodes according to user IDs for one criteria
-
-#     arr : np 2D array of all ratings for all users for one criteria
-#             (one line is [userID, vID1, vID2, score])
-
-#     Returns:
-#     - list of torch tensors, one tensor by user, all ratings for one criteria
-#     - list of users IDs in same order
-#     '''
-#     arr = sort_by_first(arr) # sorting by user IDs
-#     data_distrib = [[]]    # futur list of data for each user
-#     user_ids = [arr[0][0]] # futur list of user IDs
-#     id = arr[0][0]  # first user ID
-#     num_node =  0 
-#     for comp in arr:
-#         if comp[0]==id: # same user ID
-#             data_distrib[num_node].append(comp[1:])
-#         else: # new user ID
-#             data_distrib.append([comp[1:]])
-#             id = comp[0]
-#             user_ids.append(id)
-#             num_node += 1
-#     for i, node in enumerate(data_distrib):
-#         data_distrib[i] = torch.tensor(node)
-#     return data_distrib, user_ids
-
 def distribute_data(arr, gpu=False): 
-    
+    ''' 
+    Distributes data on nodes according to user IDs for one criteria
+
+    arr : np 2D array of all ratings for all users for one criteria
+            (one line is [userID, vID1, vID2, score])
+
+    Returns:
+    - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch) (1/user)
+    - list of users IDs in same order
+    - dictionnary of {vID: video idx}
+    '''
     arr = sort_by_first(arr) # sorting by user IDs
     user_ids , first_of_each = np.unique(arr[:,0], return_index=True)
     first_of_each = list(first_of_each)
     first_of_each.append(len(arr)) # to have last index too
-    # l_pairs = [] # list of (first, last) value for each user
-    # for i, first in enumerate(first_of_each):
-    #     l_pairs.append((first, first_of_each[i+1]))
     vids = get_all_vids(arr)
     dic = reverse_idxs(vids)
     data_distrib = []    # futur list of data for each user
@@ -126,13 +104,14 @@ def distribute_data(arr, gpu=False):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
         l2 = node_arr[:,2]
+        batchvids = get_all_vids(node_arr)
         batch1 = one_hot_vids(dic, l1)
         batch2 = one_hot_vids(dic, l2)
         batchout = torch.FloatTensor(node_arr[:,3])
-        triple = (batch1, batch2, batchout)
-        data_distrib.append(triple)
+        quadruple = (batch1, batch2, batchout, batchvids)
+        data_distrib.append(quadruple)
 
-    return data_distrib, user_ids
+    return data_distrib, user_ids, dic
 
 #def 
 
@@ -150,8 +129,8 @@ def in_and_out(comparison_data, criteria):
     '''
     one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
-    distributed, users_ids = distribute_data(full_data)
-    flow = get_flower()
+    distributed, users_ids, dic = distribute_data(full_data)
+    flow = get_flower(len(dic), dic)
     flow.set_allnodes(distributed, users_ids)
     h = flow.train(EPOCHS, verb=2)
     glob, loc = flow.output_scores()
@@ -170,7 +149,7 @@ def format_out_glob(glob, crit):
     l_out = []
     ids, scores = glob
     for i in range(len(ids)):
-        out = [ids[i].item(), crit, scores[i].item(), 0] # uncertainty is 0 for now
+        out = [int(ids[i]), crit, round(scores[i].item(), 2), 0] # uncertainty is 0 for now
         l_out.append(out)
     return l_out
 
@@ -188,7 +167,8 @@ def format_out_loc(loc, users_ids, crit):
     vids, scores = loc
     for user_id, user_vids, user_scores in zip(users_ids, vids, scores):
         for i in range(len(user_vids)):
-            out = [user_id, user_vids[i].item(), crit, user_scores[i].item(), 0] # uncertainty is 0 for now
+            out = [int(user_id), int(user_vids[i].item()), 
+                    crit, round(user_scores[i].item(), 2), 0] # uncertainty is 0 for now
             l_out.append(out)
     return l_out
 
@@ -205,7 +185,6 @@ def ml_run(comparison_data):
         print("\nPROCESSING", crit)
         glob, loc, users_ids = in_and_out(comparison_data, crit) # training
         # putting in required shape for output
-        print(torch.min(glob[1]), torch.max(glob[1]), torch.mean(glob[1]))
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
         video_scores += out_glob
@@ -223,15 +202,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         comparison_data = fetch_data()
-        # video_scores, contributor_rating_scores = ml_run(comparison_data)
-        # save_data(video_scores, contributor_rating_scores)
-
-        # print(len(video_scores))
-        # print(len(contributor_rating_scores))
-        one_crit = select_criteria(comparison_data, "reliability")
-        full_data = shape_data(one_crit)
-        distributed, users_ids = distribute_data(full_data)
-        print(distributed[0][0].shape)
-        print(distributed[0][1].shape)
-        print(distributed[0][2].shape)
-        print(len(users_ids))
+        global_scores, contributor_scores = ml_run(comparison_data)
+        save_data(global_scores, contributor_scores)

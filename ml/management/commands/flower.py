@@ -7,7 +7,7 @@ from copy import deepcopy
 from time import time
 
 from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
-from ml.management.commands.utilities import model_norm, round_loss, tens_count, node_local_loss
+from ml.management.commands.utilities import model_norm, round_loss, tens_count, node_local_loss, one_hot_vids
 #from ml.management.commands.utilities import get_node_vids, get_all_vids
 
 
@@ -30,7 +30,7 @@ class Flower():
         .check
     '''
 
-    def __init__(self, gpu=False, **kwargs):
+    def __init__(self, nb_vids, dic, gpu=False, **kwargs):
         ''' opt : optimizer
             test : test data couple (imgs,labels)
             w0 : regularisation strength
@@ -46,7 +46,7 @@ class Flower():
         self.gen_freq = 1  # generalisation frequency (>=1)
 
         self.get_classifier = get_classifier
-        self.general_model = self.get_classifier(gpu)
+        self.general_model = self.get_classifier(nb_vids, gpu)
         self.init_model = deepcopy(self.general_model)
         self.last_grad = None
         self.opt_gen = self.opt(self.general_model.parameters(), lr=self.lr_gen)
@@ -61,11 +61,11 @@ class Flower():
         self.user_ids = []
         self.opt_nodes = []
         self.nb_nodes = 0
-        # self.dic = {"honest" : -1, "trolls" : 0, "zeros" : 1, 
-                   # "one_evil" : 2, "strats" : 3, "jokers" : 4, "byzantine" : -1}
+        self.dic = dic
         self.history = ([], [], [], [], [], [], [], []) 
         # self.h_legend = ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
         # self.localtest = ([], []) # (which to pick for each node, list of (data,labels) pairs)
+        self.nb_params = nb_vids
         self.size = nb_params(self.general_model) / 10_000
 
     # ------------ population methods --------------------
@@ -78,7 +78,7 @@ class Flower():
 
         self.typ += ["unkwown"] * nb
 
-        self.models += [self.get_classifier(self.gpu) for i in range(nb)]
+        self.models += [self.get_classifier(self.nb_params, self.gpu) for i in range(nb)]
         self.weights += [self.w] * nb
         self.age = [0] * nb
         # for i in range(nb):
@@ -90,22 +90,22 @@ class Flower():
             print("Total number of nodes : {}".format(self.nb_nodes))
 
 
-    def set_localtest(self, datafull, size, nodes, fav_lab=(0,0), typ="honest"):
-        ''' create a local data for some nodes
-            datafull : source data
-            size : size of test sample
-            fav_labs : (label, strength)
-            nodes : list of nodes which use this data           
-        '''
-        id = self.dic[typ]
-        dish = (id != -1) # boolean for dishonesty
-        dt, lb = distribute_data_rd(datafull, [size], fav_lab,
-                                    dish, dish_lab=id, gpu=self.gpu)
-        dtloc = (dt[0], lb[0])
-        self.localtest[1].append(dtloc)
-        id = len(self.localtest[1]) - 1
-        for n in nodes:
-            self.localtest[0][n] = id
+    # def set_localtest(self, datafull, size, nodes, fav_lab=(0,0), typ="honest"):
+    #     ''' create a local data for some nodes
+    #         datafull : source data
+    #         size : size of test sample
+    #         fav_labs : (label, strength)
+    #         nodes : list of nodes which use this data           
+    #     '''
+    #     id = self.dic[typ]
+    #     dish = (id != -1) # boolean for dishonesty
+    #     dt, lb = distribute_data_rd(datafull, [size], fav_lab,
+    #                                 dish, dish_lab=id, gpu=self.gpu)
+    #     dtloc = (dt[0], lb[0])
+    #     self.localtest[1].append(dtloc)
+    #     id = len(self.localtest[1]) - 1
+    #     for n in nodes:
+    #         self.localtest[0][n] = id
 
     def add_nodes(self, datafull, pop, typ, fav_lab=(0,0), verb=1, **kwargs):
         ''' add nodes to the Flower 
@@ -155,29 +155,20 @@ class Flower():
             self.nb_nodes -= nb
             if verb: print("Removed {} nodes".format(nb))
         
-    def hm(self, ty):
-        ''' count nb of nodes of this type '''
-        return self.typ.count(ty)
-    
-    def pop(self):
-        ''' return dictionnary of population '''
-        c = {}
-        for ty in self.dic.keys():
-            c[ty] = self.hm(ty)
-        return c
 
     def output_scores(self):
         ''' Returns video scores both local and global '''
+        local_scores = []
+        list_ids_batchs = []
         with torch.no_grad():
-            local_scores = []
-            list_ids_batchs = []
-            for batch in self.data:
-                list_ids_batchs.append(get_node_vids(batch))
-            for n, ids_batch in enumerate(list_ids_batchs): # l_i_b[n] is batch of unique IDs of videos rated by node n
-                node_scores = self.models[n](ids_batch.float())
-                local_scores.append(node_scores)
-            vids_batch = get_all_vids(list_ids_batchs)
-            glob_scores = self.general_model(vids_batch.float())
+            for n, node in enumerate(self.data):
+                input = one_hot_vids(self.dic, node[3])
+                output = self.models[n](input)
+                local_scores.append(output)
+                list_ids_batchs.append(node[3])
+            for p in self.general_model.parameters():  # only one iteration   
+                glob_scores = p[0]
+            vids_batch = list(self.dic.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     # ---------- methods for training ------------
@@ -283,12 +274,12 @@ class Flower():
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
-                    fit_loss, gen_loss, diff = 0, 0, 0
+                    fit_loss, gen_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
                         s = torch.ones(1)  # user notation style, constant for now
-                        fit_loss += node_local_loss(self.models[n], s,  self.data[n][:,0:1],
-                                                                        self.data[n][:,1:2], 
-                                                                        self.data[n][:,2:])
+                        fit_loss += node_local_loss(self.models[n], s,  self.data[n][0],
+                                                                        self.data[n][1], 
+                                                                        self.data[n][2])
                         g = models_dist(self.models[n], self.general_model, self.pow_gen)
                         gen_loss +=  self.weights[n] * g  # generalisation term
                     fit_loss *= fit_scale
@@ -307,11 +298,9 @@ class Flower():
                     reg_loss *= reg_scale
                     loss = gen_loss + reg_loss
 
-                total_out = round_loss(fit_loss + diff
-                    + gen_loss + reg_loss)
+                total_out = round_loss(fit_loss + gen_loss + reg_loss)
                 if verb >= 2:
-                    self._print_losses(total_out, fit_loss + diff,
-                                       gen_loss, reg_loss)
+                    self._print_losses(total_out, fit_loss, gen_loss, reg_loss)
                 # Gradient descent 
                 loss.backward() 
                 self._do_step(fit_step)   
@@ -346,11 +335,11 @@ class Flower():
             print("OULALA non ça va pas là")
 
 
-def get_flower(gpu=False, **kwargs):
+def get_flower(nb_vids, dic, gpu=False, **kwargs):
     '''get a Flower using the appropriate test data (gpu or not)'''
    # if gpu:
     #    return Flower(test_gpu, gpu=gpu, **kwargs)
     #else:
      #   return Flower(test, gpu=gpu, **kwargs)
-    return Flower( gpu=gpu, **kwargs)
+    return Flower(nb_vids, dic, gpu=gpu, **kwargs)
 

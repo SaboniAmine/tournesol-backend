@@ -1,21 +1,6 @@
 import torch
 import numpy as np
 
-
-
-# def get_node_vids(batch):
-#     ''' creates a tensor containing IDs of videos rated by one user without repetition '''
-#     ids = torch.unique(batch[:,:2])
-#     batch_ids = torch.unsqueeze(ids,1)
-#     return batch_ids
-
-# def get_all_vids(l_vids):
-#     ''' l_vids : list of batches of videos IDs (1 batch/node) '''
-#     all_ids = torch.vstack(l_vids)
-#     ids = torch.unique(all_ids)
-#     batch_ids = torch.unsqueeze(ids,1)
-#     return batch_ids
-
 def tens_count(tens, val):
     ''' counts nb of -val in tensor -tens '''
     return len(tens) - round_loss(torch.count_nonzero(tens-val))
@@ -113,6 +98,11 @@ def get_all_vids(arr):
     ''' get all unique vIDs for one criteria (all users) '''
     return np.unique(arr[:,1:3])
 
+# def get_node_vids(arr):
+#     ''' creates a tensor containing IDs of videos rated by one user without repetition '''
+#     batch_ids = np.unique(arr[:, 1:3])
+#     return batch_ids
+
 def sort_by_first(arr):
     ''' sorts 2D array lines by first element of lines '''
     order = np.argsort(arr,axis=0)[:,0]
@@ -141,8 +131,6 @@ def one_hot_vids(dic, l_vid):
     '''
     batch = torch.zeros(len(l_vid), len(dic))
     for idx, vid in enumerate(l_vid):
-        # print("vid", vid)
-        # print(dic[vid])
         batch[idx][dic[vid]] = 1
     return batch
 
