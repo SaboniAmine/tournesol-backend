@@ -8,18 +8,12 @@ from time import time
 
 from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, tens_count, node_local_loss
-from ml.management.commands.utilities import get_node_vids, get_all_vids
+#from ml.management.commands.utilities import get_node_vids, get_all_vids
 
-def get_classifier(gpu=False):
-    ''' returns linear baseline classifier '''
-    model = nn.Sequential( 
-        nn.Flatten(),
-        nn.Linear(1, 10),
-        nn.ReLU(),
-        nn.Linear(10, 10),
-        nn.ReLU(),
-        nn.Linear(10, 1)
-            )
+
+def get_classifier(nb_vids, gpu=False):
+    ''' returns one layer model for one-hot entries '''
+    model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
     if gpu:
         return model.cuda()
     return model

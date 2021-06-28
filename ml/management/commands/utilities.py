@@ -1,20 +1,24 @@
 import torch
+import numpy as np
 
 
 
-def get_node_vids(batch):
-    ''' creates a tensor containing IDs of videos rated by one user without repetition '''
-    ids = torch.unique(batch[:,:2])
-    batch_ids = torch.unsqueeze(ids,1)
-    return batch_ids
+# def get_node_vids(batch):
+#     ''' creates a tensor containing IDs of videos rated by one user without repetition '''
+#     ids = torch.unique(batch[:,:2])
+#     batch_ids = torch.unsqueeze(ids,1)
+#     return batch_ids
 
-def get_all_vids(l_vids):
-    ''' l_vids : list of batches of videos IDs (1 batch/node) '''
-    all_ids = torch.vstack(l_vids)
-    ids = torch.unique(all_ids)
-    batch_ids = torch.unsqueeze(ids,1)
-    return batch_ids
+# def get_all_vids(l_vids):
+#     ''' l_vids : list of batches of videos IDs (1 batch/node) '''
+#     all_ids = torch.vstack(l_vids)
+#     ids = torch.unique(all_ids)
+#     batch_ids = torch.unsqueeze(ids,1)
+#     return batch_ids
 
+def tens_count(tens, val):
+    ''' counts nb of -val in tensor -tens '''
+    return len(tens) - round_loss(torch.count_nonzero(tens-val))
 
 # metrics on models
 def extract_grad(model):
@@ -33,7 +37,6 @@ def nb_params(model):
     '''return number of parameters of a model'''
     return sum(p.numel() for p in model.parameters())
 
-#loss and scoring functions 
 def models_dist(model_loc, model_glob, pow=(1,1)):  
     ''' l1 distance between global and local parameter
         will be mutliplied by w_n 
@@ -60,10 +63,6 @@ def round_loss(tens, dec=0):
     else:
         return round(tens.item(), dec)
 
-def tens_count(tens, val):
-    ''' counts nb of -val in tensor -tens '''
-    return len(tens) - round_loss(torch.count_nonzero(tens-val))
-
 def score(model, datafull):
     ''' returns accuracy provided models, images and GTs '''
     out = model(datafull[0])
@@ -74,7 +73,6 @@ def score(model, datafull):
     return c/len(datafull[0])
 
 # losses
-
 def fbbt(t,r):
     ''' fbbt loss function '''
     return torch.log(abs(torch.sinh(t)/t)) + r * t + torch.log(torch.tensor(2))
@@ -105,3 +103,52 @@ def node_local_loss(model, s, a_batch, b_batch, r_batch):
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
     return loss / len(a_batch) + s_loss(s)
+
+# to handle data (used in ml_train)
+def rescale_rating(rating):
+    ''' rescales from 0-100 to [-1,1] float '''
+    return rating / 50 - 1
+
+def get_all_vids(arr):
+    ''' get all unique vIDs for one criteria (all users) '''
+    return np.unique(arr[:,1:3])
+
+def sort_by_first(arr):
+    ''' sorts 2D array lines by first element of lines '''
+    order = np.argsort(arr,axis=0)[:,0]
+    return arr[order,:]
+
+def one_hot_vid(dic, vid):
+    ''' One-hot inputs for neural network
+    
+    dic: dictionnary of {vID: idx}
+    vid: vID
+
+    Returns: 1D tensor with 0s and 1 only for video index
+    '''
+    nb_vid = len(dic)
+    tens = torch.zeros(nb_vid)
+    tens[dic[vid]] = 1
+    return tens
+
+def one_hot_vids(dic, l_vid):
+    ''' One-hot inputs for neural network, list to batch
+    
+    dic: dictionnary of {vID: idx}
+    vid: list of vID
+
+    Returns: 2D tensor with 1 line being 0s and 1 only for video index
+    '''
+    batch = torch.zeros(len(l_vid), len(dic))
+    for idx, vid in enumerate(l_vid):
+        # print("vid", vid)
+        # print(dic[vid])
+        batch[idx][dic[vid]] = 1
+    return batch
+
+def reverse_idxs(vids):
+    ''' Returns dictionnary of {vid: idx} '''
+    dic = {}
+    for idx, vid in enumerate(vids):
+        dic[vid] = idx
+    return dic 
