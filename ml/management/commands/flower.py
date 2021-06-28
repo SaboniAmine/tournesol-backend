@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -358,6 +359,4 @@ def get_flower(gpu=False, **kwargs):
     #else:
      #   return Flower(test, gpu=gpu, **kwargs)
     return Flower( gpu=gpu, **kwargs)
-
-
 

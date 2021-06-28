@@ -1,3 +1,4 @@
+
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
@@ -6,6 +7,7 @@ from settings.settings import VIDEO_FIELDS
 
 import numpy as np
 import torch
+
 from ml.management.commands.flower import get_flower
 
 # CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
@@ -13,7 +15,8 @@ from ml.management.commands.flower import get_flower
 #                 "better_habits", "entertaining_relaxing"]
 
 CRITERIAS = ["reliability"]
-EPOCHS = 50
+EPOCHS = 1
+
 
 
 def fetch_data():
@@ -23,7 +26,6 @@ def fetch_data():
     Returns:
     - comparison_data: list of [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str, score: float, weight: float]
     """
-    print("fetch")
     comparison_data = [
         [comparison.user_id, comparison.video_1_id, comparison.video_2_id, criteria, getattr(comparison, criteria), getattr(comparison, f"{criteria}_weight")]
         for comparison in Comparison.objects.all() for criteria in VIDEO_FIELDS
@@ -32,30 +34,54 @@ def fetch_data():
     return comparison_data
 
 def select_criteria(comparison_data, crit):
-    ''' extracts data for this criteria where score is not None '''
+    ''' 
+    Extracts data for this criteria where score is not None 
+    
+    Returns: 
+    - list of all ratings for this criteria
+        (one element is [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str (crit), score: float, weight: float])
+    '''
     l_ratings = [comp for comp in comparison_data if (comp[3] == crit and comp[4] is not None)]
     return l_ratings
 
-def rescale_score(score):
+def rescale_rating(rating):
     ''' rescales from 0-100 to [-1,1] float '''
-    return score / 50 - 1
+    return rating / 50 - 1
+
+def rescale_scores(tens):
+    ''' 
+    Rescales scores to [-100, 100]
+
+    tens: column tensor of scores
+
+
+    '''
 
 def shape_data(l_ratings):
     ''' 
-    l_notes : list of not None notations for one criteria 
-    Returns : one array with 4 columns : contribID, ID1, ID2, score ([0,100]) 
+    l_ratings : list of not None notations for one criteria, all users
+
+    Returns : one array with 4 columns : userID, vID1, vID2, score ([-1,1]) 
     '''
-    l_cleared = [rating[:3] + [rescale_score(rating[4])] for rating in l_ratings]
+    l_cleared = [rating[:3] + [rescale_rating(rating[4])] for rating in l_ratings]
     arr = np.asarray(l_cleared)
     return arr
 
 def sort_by_first(arr):
-    ''' sort array lines by first element of lines '''
+    ''' sorts 2D array lines by first element of lines '''
     order = np.argsort(arr,axis=0)[:,0]
     return arr[order,:]
 
 def distribute_data(arr, gpu=False):
-    ''' distributes data on nodes according to user IDs '''
+    ''' 
+    Distributes data on nodes according to user IDs for one criteria
+
+    arr : np 2D array of all ratings for all users for one criteria
+            (one line is [userID, vID1, vID2, score])
+
+    Returns:
+    - list of torch tensors, one tensor by user, all ratings for one criteria
+    '''
     arr = sort_by_first(arr) # sorting by user IDs
     data_distrib = [[]]
     user_ids = [arr[0][0]] 
@@ -74,7 +100,17 @@ def distribute_data(arr, gpu=False):
     return data_distrib, user_ids
 
 def in_and_out(comparison_data, criteria):
-    ''' trains and returns video scores'''
+    ''' 
+    Trains models and returns video scores
+
+    comparison_data: output of fetch_data()
+    criteria: int, rating criteria
+    
+    Returns :   
+    - (tensor of all vIDS , tensor of global video scores)
+    - (list of tensor of local vIDs , list of tensors of local video scores)
+    - list of users IDs in same order as second output
+    '''
     one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
     distributed, users_ids = distribute_data(full_data)
@@ -85,21 +121,37 @@ def in_and_out(comparison_data, criteria):
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
-    ''' put data in list of global scores '''
+    ''' 
+    Puts data in list of global scores (one criteria)
+    
+    glob: global scores in 2D tensor (1 line: [vID, score])
+    crit: criteria
+    
+    Returns: 
+    - list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
+    '''
     l_out = []
     ids, scores = glob
     for i in range(len(ids)):
-        out = [ids[i].item(), crit, scores[i].item(), 0]
+        out = [ids[i].item(), crit, scores[i].item(), 0] # uncertainty is 0 for now
         l_out.append(out)
     return l_out
 
 def format_out_loc(loc, users_ids, crit):
-    ''' put data in list of local scores '''
+    ''' 
+    Puts data in list of local scores (one criteria)
+
+    loc: 
+    users_ids: list of user IDs in same order
+    
+    Returns : 
+    - list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
+    '''
     l_out = []
     vids, scores = loc
     for user_id, user_vids, user_scores in zip(users_ids, vids, scores):
         for i in range(len(user_vids)):
-            out = [user_id, user_vids[i].item(), crit, user_scores[i].item(), 0]
+            out = [user_id, user_vids[i].item(), crit, user_scores[i].item(), 0] # uncertainty is 0 for now
             l_out.append(out)
     return l_out
 
@@ -116,6 +168,7 @@ def ml_run(comparison_data):
         print("\nPROCESSING", crit)
         glob, loc, users_ids = in_and_out(comparison_data, crit) # training
         # putting in required shape for output
+        print(torch.min(glob[1]), torch.max(glob[1]), torch.mean(glob[1]))
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
         video_scores += out_glob
