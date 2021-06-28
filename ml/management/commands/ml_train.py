@@ -112,7 +112,7 @@ def shape_data(l_ratings):
 def distribute_data(arr, gpu=False): 
     
     arr = sort_by_first(arr) # sorting by user IDs
-    user_ids , first_of_each = np.unique(arr, return_index=True)
+    user_ids , first_of_each = np.unique(arr[:,0], return_index=True)
     first_of_each = list(first_of_each)
     first_of_each.append(len(arr)) # to have last index too
     # l_pairs = [] # list of (first, last) value for each user
@@ -121,14 +121,11 @@ def distribute_data(arr, gpu=False):
     vids = get_all_vids(arr)
     dic = reverse_idxs(vids)
     data_distrib = []    # futur list of data for each user
-    user_ids = [arr[0][0]] # futur list of user IDs
 
     for i in range(len(first_of_each) - 1):
-        print("i", i)
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
         l2 = node_arr[:,2]
-        print("len", len(l1), len(l2))
         batch1 = one_hot_vids(dic, l1)
         batch2 = one_hot_vids(dic, l2)
         batchout = torch.FloatTensor(node_arr[:,3])
@@ -234,5 +231,7 @@ class Command(BaseCommand):
         one_crit = select_criteria(comparison_data, "reliability")
         full_data = shape_data(one_crit)
         distributed, users_ids = distribute_data(full_data)
-        print(distributed)
-        print(users_ids)
+        print(distributed[0][0].shape)
+        print(distributed[0][1].shape)
+        print(distributed[0][2].shape)
+        print(len(users_ids))
