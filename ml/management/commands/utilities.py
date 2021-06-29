@@ -1,6 +1,31 @@
 import torch
 import numpy as np
 
+"""
+Machine Learning utilies
+
+Organisation:
+- Main file is "ml_train"
+- ML model and decentralised structure are in "flower.py"
+- some helpful small functions are here
+
+
+Notations:
+- node = user : contributor
+- vid = vID : video, video ID
+- score : score of a video outputted by the algorithm, range?
+
+- idx : index
+- l_someting : list of someting
+- arr : numpy array
+- tens : torch tensor
+- dic : dictionnary
+
+Usage:
+- mostly independent functions to be imported elsewhere
+
+"""
+
 def tens_count(tens, val):
     ''' counts nb of -val in tensor -tens '''
     return len(tens) - round_loss(torch.count_nonzero(tens-val))
@@ -42,7 +67,7 @@ def model_norm(model_glob, pow=(2,1)):
     return norm
 
 def round_loss(tens, dec=0): 
-    '''from an input scalar tensor returns rounded integer'''
+    ''' from an input scalar tensor or int/float return rounded int/float '''
     if type(tens)==int or type(tens)==float:
         return round(tens, dec)
     else:
@@ -97,11 +122,6 @@ def rescale_rating(rating):
 def get_all_vids(arr):
     ''' get all unique vIDs for one criteria (all users) '''
     return np.unique(arr[:,1:3])
-
-# def get_node_vids(arr):
-#     ''' creates a tensor containing IDs of videos rated by one user without repetition '''
-#     batch_ids = np.unique(arr[:, 1:3])
-#     return batch_ids
 
 def sort_by_first(arr):
     ''' sorts 2D array lines by first element of lines '''

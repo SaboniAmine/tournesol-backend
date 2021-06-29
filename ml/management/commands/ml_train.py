@@ -19,20 +19,29 @@ Organisation:
 - ML model and decentralised structure are in "flower.py"
 - some helpful small functions are in "utilities.py"
 
-
 Notations:
 - node = user : contributor
 - vid = vID : video, video ID
 - rating : rating provided by a contributor between 2 videos, in [0,100] or [-1,1]
 - score : score of a video outputted by the algorithm, range?
-
 - idx : index
 - l_someting : list of someting
 - arr : numpy array
 - tens : torch tensor
 - dic : dictionnary
 
-Usage:
+Structure:
+- fetch_data() provides data from the database
+- ml_run() uses this data as input, trains via in_and_out()
+     and returns video scores
+- save_data() takes these scores and save them (TO DO)
+- these 3 are called by Django at the end of this file
+
+USAGE:
+- define global variables EPOCHS and CRITERIAS
+-- EPOCHS: number of training epochs
+-- CRITERIAS: list of str (there is one training for each criteria)
+- call ml_run(fetch_data()) if you just want the scores in python
 
 """
 
@@ -43,7 +52,6 @@ CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy",
 
 # CRITERIAS = ["reliability"]
 EPOCHS = 1
-
 
 
 def fetch_data():
@@ -60,9 +68,11 @@ def fetch_data():
     return comparison_data
 
 def select_criteria(comparison_data, crit):
-    ''' 
-    Extracts data for this criteria where score is not None 
-    
+    ''' Extracts data for this criteria where score is not None 
+
+    comparison_data: output of fetch_data()
+    crit: str, name of criteria
+        
     Returns: 
     - list of all ratings for this criteria
         (one element is [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str (crit), score: float, weight: float])
@@ -89,7 +99,7 @@ def distribute_data(arr, gpu=False):
 
     Returns:
     - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch) (1/user)
-    - list of users IDs in same order
+    - list/array of users IDs in same order
     - dictionnary of {vID: video idx}
     '''
     arr = sort_by_first(arr) # sorting by user IDs
@@ -113,8 +123,6 @@ def distribute_data(arr, gpu=False):
 
     return data_distrib, user_ids, dic
 
-#def 
-
 def in_and_out(comparison_data, criteria):
     ''' 
     Trains models and returns video scores
@@ -134,6 +142,7 @@ def in_and_out(comparison_data, criteria):
     flow.set_allnodes(distributed, users_ids)
     h = flow.train(EPOCHS, verb=2)
     glob, loc = flow.output_scores()
+    flow.check()
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
@@ -173,25 +182,26 @@ def format_out_loc(loc, users_ids, crit):
     return l_out
 
 def ml_run(comparison_data):
-    """
-    Uses data loaded
+    """ Runs the ml algorithm for all CRITERIAS (global variable)
+    
+    comparison_data: output of fetch_data()
 
     Returns:
     - video_scores: list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
     - contributor_rating_scores: list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
     """ # not better to regroup contributors in same list or smthg ?
-    video_scores, contributor_rating_scores = [], []
+    global_scores, local_scores = [], []
     for crit in CRITERIAS:
         print("\nPROCESSING", crit)
-        glob, loc, users_ids = in_and_out(comparison_data, crit) # training
+        glob, loc, users_ids = in_and_out(comparison_data, crit) # training, see "flower.py"
         # putting in required shape for output
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
-        video_scores += out_glob
-        contributor_rating_scores += out_loc
-    return video_scores, contributor_rating_scores
+        global_scores += out_glob
+        local_scores += out_loc
+    return global_scores, local_scores
 
-def save_data(video_scores, contributor_rating_scores):
+def save_data(global_scores, local_scores):
     """
     Saves in the scores for Videos and ContributorRatings
     """
@@ -204,3 +214,5 @@ class Command(BaseCommand):
         comparison_data = fetch_data()
         global_scores, contributor_scores = ml_run(comparison_data)
         save_data(global_scores, contributor_scores)
+
+        print("global:", len(global_scores),"local:",  len(contributor_scores))
