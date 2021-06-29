@@ -72,13 +72,14 @@ class Flower():
         self.dic = dic # {video ID : video index (for that criteria)}
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
 
-        self.opt = optim.Adam
-        self.lr_node = 0.2 
-        self.lr_gen = 0.2
+        self.opt = optim.SGD
+        all_lrs = 0.01
+        self.lr_node = all_lrs     # local learning rate (local scores)
+        self.lr_gen = all_lrs   # global learning rate (global scores)
+        self.lr_s = all_lrs     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
-        self.w0 = 0.2       # regularisation strength
-        self.w = 0.05       # default weight for a node
-        self.weights = []    # weight of each node
+        self.w0 = 0       # regularisation strength
+        self.w = 0.01      # default weight for a node
 
         self.get_classifier = get_classifier # neural network to use
         self.general_model = self.get_classifier(nb_vids, gpu)
@@ -90,8 +91,10 @@ class Flower():
         self.data = []  # list of nodes, one being (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
         self.models = []  # one model for each node
         self.opt_nodes = [] # one optimizer for each model (1/node)
+        self.s_nodes = []   # s parameter for each node (represents notation style)
         self.age = []          # number of epochs each node has been trained
-        self.user_ids = []     # id of each node
+        self.user_ids = []     # id of each node (user IDs)
+        self.weights = []    # weight of each node
         self.nb_nodes = 0
 
         self.size = nb_params(self.general_model) / 10_000
@@ -110,12 +113,19 @@ class Flower():
         self.user_ids = user_ids
         nb = len(self.data)
 
-        self.models = [self.get_classifier(self.nb_params, self.gpu) for i in range(nb)]
+        
         self.weights = [self.w] * nb
         self.age = [0] * nb
         self.nb_nodes = nb
-        self.opt_nodes = [self.opt(self.models[n].parameters(), lr=self.lr_node) 
-                            for n in range(nb) ]
+        self.models = [self.get_classifier(self.nb_params, self.gpu) for i in range(nb)]
+        self.s_nodes = [torch.ones(1, requires_grad=True) for n in range(nb)] # s is initialized at 1
+        self.opt_nodes = [self.opt( [
+                                    {'params': self.models[n].parameters()}, 
+                                    {'params': self.s_nodes[n], 'lr': self.lr_s},
+                                    ], lr=self.lr_node
+                                    ) for n in range(nb)]
+                            
+        
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
@@ -126,18 +136,25 @@ class Flower():
         - (tensor of all vIDS , tensor of global video scores)
         - (list of tensor of local vIDs , list of tensors of local video scores)
         '''
+        mean_choice = 0 # where to center scores
         local_scores = []
         list_ids_batchs = []
         with torch.no_grad():
-            for n, node in enumerate(self.data):
-                input = one_hot_vids(self.dic, node[3])
-                output = self.models[n](input)
-                local_scores.append(output)
-                list_ids_batchs.append(node[3])
             for p in self.general_model.parameters():  # only one iteration   
                 glob_scores = p[0]
+            m = torch.mean(glob_scores) # mean of scores to unbias
+            var = torch.var(glob_scores)
+            mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
+            print("minimax:", mini,maxi)
+            print("variance of global scores :", var.item())
+            glob_scores2 = glob_scores + mean_choice - m # set mean to 1
+            for n, node in enumerate(self.data):
+                input = one_hot_vids(self.dic, node[3])
+                output = self.models[n](input) + mean_choice - m
+                local_scores.append(output)
+                list_ids_batchs.append(node[3])
             vids_batch = list(self.dic.keys())
-        return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
+        return (vids_batch, glob_scores2), (list_ids_batchs, local_scores)
 
     # ---------- methods for training ------------
     def _set_lr(self):
@@ -197,9 +214,9 @@ class Flower():
     def _print_losses(self, tot, fit, gen, reg):
         ''' prints losses '''
         print("total loss : ", tot) 
-        print("fitting : ", round_loss(fit),
-                ', generalisation : ', round_loss(gen),
-                ', regularisation : ', round_loss(reg))
+        print("fitting : ", round_loss(fit, 2),
+                ', generalisation : ', round_loss(gen, 2),
+                ', regularisation : ', round_loss(reg, 2))
 
     # ====================  TRAINING ================== 
 
@@ -213,8 +230,8 @@ class Flower():
         loss, fit_loss, gen_loss, reg_loss = 0, 0, 0, 0
         c_fit, c_gen = 0, 0
 
-        fit_scale = 20 / self.nb_nodes
-        gen_scale = 1 / self.nb_nodes / self.size
+        fit_scale = 1 / self.nb_nodes
+        gen_scale = 1 / self.nb_nodes / self.size # self.weights is used addition
         reg_scale = self.w0 / self.size
 
         reg_loss = reg_scale * model_norm(self.general_model, self.pow_reg)  
@@ -239,10 +256,16 @@ class Flower():
                     fit_loss, gen_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
                         s = torch.ones(1)  # user notation style, constant for now
-                        fit_loss += node_local_loss(self.models[n], s,  self.data[n][0],
-                                                                        self.data[n][1], 
-                                                                        self.data[n][2])
-                        g = models_dist(self.models[n], self.general_model, self.pow_gen)
+                        fit_loss += node_local_loss(self.models[n], self.s_nodes[n],  
+                                                                    self.data[n][0],
+                                                                    self.data[n][1], 
+                                                                    self.data[n][2])
+                        g = models_dist(self.models[n], 
+                                        self.general_model, 
+                                        self.pow_gen, 
+                                        #self.data[n][4]
+                                        None
+                                        ) # mask
                         gen_loss +=  self.weights[n] * g  # generalisation term
                     fit_loss *= fit_scale
                     gen_loss *= gen_scale

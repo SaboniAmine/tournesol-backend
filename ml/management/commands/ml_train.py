@@ -9,7 +9,8 @@ import numpy as np
 import torch
 
 from ml.management.commands.flower import get_flower
-from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids, reverse_idxs
+from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
+from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask
 
 """
 Machine Learning main python file
@@ -29,6 +30,7 @@ Notations:
 - arr : numpy array
 - tens : torch tensor
 - dic : dictionnary
+- VARIABLE_NAME : global variable
 
 Structure:
 - fetch_data() provides data from the database
@@ -46,12 +48,12 @@ USAGE:
 """
 
 # global variables
-CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
-                "layman_friendly", "diversity_inclusion", "backfire_risk", 
-                "better_habits", "entertaining_relaxing"]
+# CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
+#                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
+#                 "better_habits", "entertaining_relaxing"]
 
-# CRITERIAS = ["reliability"]
-EPOCHS = 1
+CRITERIAS = ["reliability"]
+EPOCHS = 3
 
 
 def fetch_data():
@@ -98,7 +100,7 @@ def distribute_data(arr, gpu=False):
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch) (1/user)
+    - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch, mask) (1/user)
     - list/array of users IDs in same order
     - dictionnary of {vID: video idx}
     '''
@@ -106,7 +108,7 @@ def distribute_data(arr, gpu=False):
     user_ids , first_of_each = np.unique(arr[:,0], return_index=True)
     first_of_each = list(first_of_each)
     first_of_each.append(len(arr)) # to have last index too
-    vids = get_all_vids(arr)
+    vids = get_all_vids(arr)  # all unique video IDs
     dic = reverse_idxs(vids)
     data_distrib = []    # futur list of data for each user
 
@@ -114,12 +116,13 @@ def distribute_data(arr, gpu=False):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
         l2 = node_arr[:,2]
-        batchvids = get_all_vids(node_arr)
+        batchvids = get_all_vids(node_arr) # unique video IDs of node
         batch1 = one_hot_vids(dic, l1)
         batch2 = one_hot_vids(dic, l2)
+        mask = get_mask(batch1, batch2)
         batchout = torch.FloatTensor(node_arr[:,3])
-        quadruple = (batch1, batch2, batchout, batchvids)
-        data_distrib.append(quadruple)
+        node = (batch1, batch2, batchout, batchvids, mask)
+        data_distrib.append(node)
 
     return data_distrib, user_ids, dic
 
@@ -135,14 +138,17 @@ def in_and_out(comparison_data, criteria):
     - (list of tensor of local vIDs , list of tensors of local video scores)
     - list of users IDs in same order as second output
     '''
-    one_crit = select_criteria(comparison_data, criteria)
+    one_crit = select_criteria(comparison_data[:20], criteria)
     full_data = shape_data(one_crit)
     distributed, users_ids, dic = distribute_data(full_data)
     flow = get_flower(len(dic), dic)
     flow.set_allnodes(distributed, users_ids)
-    h = flow.train(EPOCHS, verb=2)
+    h = flow.train(EPOCHS, verb=2) # EPOCHS: global variable
     glob, loc = flow.output_scores()
-    flow.check()
+    disp_one_by_line(flow.s_nodes[:10])
+    ar = np.asarray([tens.item() for tens in flow.s_nodes])
+    print("ssssssssss", np.min(ar), np.max(ar))
+    flow.check() # some tests
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
@@ -212,7 +218,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         comparison_data = fetch_data()
+        seedall(1)
         global_scores, contributor_scores = ml_run(comparison_data)
         save_data(global_scores, contributor_scores)
+
+        disp_one_by_line(global_scores[:10])
+        disp_one_by_line(contributor_scores[:10])
+        check_one(6094, global_scores, contributor_scores)
 
         print("global:", len(global_scores),"local:",  len(contributor_scores))

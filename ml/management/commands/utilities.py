@@ -23,51 +23,48 @@ Notations:
 
 Usage:
 - mostly independent functions to be imported elsewhere
-
 """
-
-def tens_count(tens, val):
-    ''' counts nb of -val in tensor -tens '''
-    return len(tens) - round_loss(torch.count_nonzero(tens-val))
 
 # metrics on models
 def extract_grad(model):
-    '''return list of gradients of a model'''
+    ''' returns list of gradients of a model '''
     l_grad =  [p.grad for p in model.parameters()]
     return l_grad
 
 def sp(l_grad1, l_grad2):
-    '''scalar product of 2 lists of gradients'''
+    ''' scalar product of 2 lists of gradients '''
     s = 0
     for g1, g2 in zip(l_grad1, l_grad2):
         s += (g1 * g2).sum()
     return round_loss(s, 4)
 
 def nb_params(model):
-    '''return number of parameters of a model'''
+    ''' returns number of parameters of a model '''
     return sum(p.numel() for p in model.parameters())
 
-def models_dist(model_loc, model_glob, pow=(1,1)):  
-    ''' l1 distance between global and local parameter
-        will be mutliplied by w_n 
-        pow : (internal power, external power)
+def models_dist(model1, model2, pow=(1,1), mask=None):  
+    ''' distance between 2 models (l1 by default)
+
+    pow : (internal power, external power)
     '''
     q, p = pow
-    dist = sum(((theta - rho)**q).abs().sum() for theta, rho in 
-                  zip(model_loc.parameters(), model_glob.parameters()))**p
+    if mask is None:
+        mask = [torch.ones_like(param) for param in model1.parameters()]
+    dist = sum((((theta - rho) * coef)**q).abs().sum() for theta, rho, coef in 
+                  zip(model1.parameters(), model2.parameters(), mask))**p
     return dist
 
-def model_norm(model_glob, pow=(2,1)): 
-    ''' l2 squared regularisation of global parameter
-     will be multiplied by w_0 
+def model_norm(model, pow=(2,1)): 
+    ''' norm of a model (l2 squared by default)
+
      pow : (internal power, external power)
      '''
     q, p = pow
-    norm = sum((param**q).abs().sum() for param in model_glob.parameters())**p
+    norm = sum((param**q).abs().sum() for param in model.parameters())**p
     return norm
 
 def round_loss(tens, dec=0): 
-    ''' from an input scalar tensor or int/float return rounded int/float '''
+    ''' from an input scalar tensor or int/float returns rounded int/float '''
     if type(tens)==int or type(tens)==float:
         return round(tens, dec)
     else:
@@ -82,7 +79,7 @@ def score(model, datafull):
         c += int(a==b)
     return c/len(datafull[0])
 
-# losses
+# losses (used in flower.py)
 def fbbt(t,r):
     ''' fbbt loss function '''
     return torch.log(abs(torch.sinh(t)/t)) + r * t + torch.log(torch.tensor(2))
@@ -114,7 +111,7 @@ def node_local_loss(model, s, a_batch, b_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
     return loss / len(a_batch) + s_loss(s)
 
-# to handle data (used in ml_train)
+# to handle data (used in ml_train.py)
 def rescale_rating(rating):
     ''' rescales from 0-100 to [-1,1] float '''
     return rating / 50 - 1
@@ -122,6 +119,16 @@ def rescale_rating(rating):
 def get_all_vids(arr):
     ''' get all unique vIDs for one criteria (all users) '''
     return np.unique(arr[:,1:3])
+
+def get_mask(batch1, batch2):
+    ''' get mask '''
+    batch = batch1 + batch2
+    summed = np.sum(np.asarray(batch), axis=0) # CHANGE TO USE TORCH
+    b = summed!=0 # array of boolean (True if video on node)
+    to = torch.Tensor(b)
+    return [to]
+
+
 
 def sort_by_first(arr):
     ''' sorts 2D array lines by first element of lines '''
@@ -160,3 +167,34 @@ def reverse_idxs(vids):
     for idx, vid in enumerate(vids):
         dic[vid] = idx
     return dic 
+
+# debug helpers
+def check_one(vid, comp_glob, comp_loc):
+    ''' prints global and local scores for one video '''
+    print("all we have on video: ", vid)
+    for score in comp_glob:
+        if score[0]==vid:
+            print(score)
+    for score in comp_loc:
+        if score[1]==vid:
+            print(score)
+
+def seedall(s):
+    ''' seeds all sources of randomness '''
+    reproducible = (s >= 0)
+    torch.manual_seed(s)
+    #random.seed(s)
+    np.random.seed(s)
+    torch.backends.cudnn.deterministic = reproducible
+    torch.backends.cudnn.benchmark     = not reproducible
+    print("\nSeeded all to", s)
+
+def disp_one_by_line(it):
+    ''' prints one iteration by line '''
+    for obj in it:
+        print(obj)
+
+# miscellaneous
+def tens_count(tens, val):
+    ''' counts nb of -val in tensor -tens '''
+    return len(tens) - round_loss(torch.count_nonzero(tens-val))
