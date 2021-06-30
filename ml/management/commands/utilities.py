@@ -1,5 +1,7 @@
 import torch
 import numpy as np
+import json
+import pickle 
 
 """
 Machine Learning utilies
@@ -199,3 +201,30 @@ def disp_one_by_line(it):
 def tens_count(tens, val):
     ''' counts nb of -val in tensor -tens '''
     return len(tens) - round_loss(torch.count_nonzero(tens-val))
+
+def save_to_json(global_scores, local_scores, suff=""):
+    ''' saves scores in json files '''
+    with open("global_scores{}.json".format(suff), 'w') as f:
+        json.dump(global_scores, f, indent=1) 
+    with open("local_scores{}.json".format(suff), 'w') as f:
+        json.dump(local_scores, f, indent=1) 
+
+def load_from_json(suff=""):
+    ''' loads previously saved data '''
+    with open("global_scores{}.json".format(suff), 'r') as f:
+        global_scores = json.load(f)
+    with open("local_scores{}.json".format(suff), 'r') as f:
+        local_scores = json.load(f)
+    return global_scores, local_scores
+
+def save_to_pickle(flower, suff=""):
+    ''' save python object to pickle file '''
+    filename = 'flower{}.p'.format(suff)
+    with open(filename, 'wb') as filehandler:
+        pickle.dump(flower, filehandler)
+
+def load_from_pickle(suff=""):
+    filename = 'flower{}.p'.format(suff)
+    with open(filename, 'rb') as filehandler:
+        flower = pickle.load(filehandler)
+    return flower

@@ -1,4 +1,5 @@
 
+from os import EX_NOPERM
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
@@ -8,9 +9,11 @@ from settings.settings import VIDEO_FIELDS
 import numpy as np
 import torch
 
+
 from ml.management.commands.flower import get_flower
 from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
 from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask
+from ml.management.commands.utilities import save_to_json, load_from_json, save_to_pickle, load_from_pickle
 
 """
 Machine Learning main python file
@@ -46,13 +49,19 @@ USAGE:
 - call ml_run(fetch_data()) if you just want the scores in python
 
 """
-
 # global variables
-CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
-                "layman_friendly", "diversity_inclusion", "backfire_risk", 
-                "better_habits", "entertaining_relaxing"]
 
-#CRITERIAS = ["reliability"]
+EXPERIMENT_MODE = False
+
+if EXPERIMENT_MODE:
+    CRITERIAS = ["reliability"]
+else:
+    CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
+                    "layman_friendly", "diversity_inclusion", "backfire_risk", 
+                    "better_habits", "entertaining_relaxing"]
+    EPOCHS = 300
+
+
 
 
 
@@ -128,7 +137,7 @@ def distribute_data(arr, gpu=False):
 
 
 
-def in_and_out(comparison_data, criteria):
+def in_and_out(comparison_data, criteria, epochs, verb=2):
     ''' 
     Trains models and returns video scores
 
@@ -140,18 +149,24 @@ def in_and_out(comparison_data, criteria):
     - (list of tensor of local vIDs , list of tensors of local video scores)
     - list of users IDs in same order as second output
     '''
+    new_training = True
     one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
     distributed, users_ids, dic = distribute_data(full_data)
-    flow = get_flower(len(dic), dic)
-    flow.set_allnodes(distributed, users_ids)
-    h = flow.train(EPOCHS, verb=2) # EPOCHS: global variable
+    if new_training or not EXPERIMENT_MODE:
+        flow = get_flower(len(dic), dic)
+        flow.set_allnodes(distributed, users_ids)
+        h = flow.train(epochs, verb=verb) # EPOCHS: global variable
+    else:
+        flow = load_from_pickle()
     glob, loc = flow.output_scores()
-    disp_one_by_line(flow.s_nodes[:])
-    ar = np.asarray([tens.item() for tens in flow.s_nodes])
-    print("ssssssssss", np.min(ar), np.max(ar))
-    flow.check() # some tests
-    print("nb_nodes", flow.nb_nodes)
+    if EXPERIMENT_MODE:
+        disp_one_by_line(flow.s_nodes[:5])
+        ar = np.asarray([tens.item() for tens in flow.s_nodes])
+        print("ssssssssss", np.min(ar), np.max(ar))
+        save_to_pickle(flow)
+        flow.check() # some tests
+        print("nb_nodes", flow.nb_nodes)
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
@@ -190,7 +205,7 @@ def format_out_loc(loc, users_ids, crit):
             l_out.append(out)
     return l_out
 
-def ml_run(comparison_data):
+def ml_run(comparison_data, epochs, verb=2):
     """ Runs the ml algorithm for all CRITERIAS (global variable)
     
     comparison_data: output of fetch_data()
@@ -202,7 +217,7 @@ def ml_run(comparison_data):
     global_scores, local_scores = [], []
     for crit in CRITERIAS:
         print("\nPROCESSING", crit)
-        glob, loc, users_ids = in_and_out(comparison_data, crit) # training, see "flower.py"
+        glob, loc, users_ids = in_and_out(comparison_data, crit, epochs, verb) # training, see "flower.py"
         # putting in required shape for output
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
@@ -216,31 +231,49 @@ def save_data(global_scores, local_scores):
     """
     pass
 
-EPOCHS = 300
+
+# ============= for experiments only ========= production code below this
 TEST_DATA = [
-                # [0, 100, 101, "reliability", 100, 0],
+                [0, 100, 101, "reliability", 100, 0],
+                [0, 100, 101, "reliability", 100, 0],
+                [1, 100, 101, "reliability", 100, 0]
                 # [0, 101, 110, "reliability", 0, 0],
                 # [1, 102, 103, "reliability", 70, 0],
                 # [2, 104, 105, "reliability", 50, 0],
                 # [3, 106, 107, "reliability", 30, 0],
                 # [4, 108, 109, "reliability", 0, 0],
-                # [5, 108, 109, "reliability", 100, 0],
-                # [5, 666, 667, "reliability", 100, 0],
+                # [5, 109, 209, "reliability", 0, 0],
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
-
+TRAIN = True 
+NAME = ""
+EPOCHSEXP = 300
 class Command(BaseCommand):
     help = 'Runs the ml'
-
+    save_to_pickle([],"a")
     def handle(self, *args, **options):
-        comparison_data = fetch_data()
+        if EXPERIMENT_MODE: 
+            if TRAIN:
+                seedall(2)
+                comparison_data = fetch_data()
+                global_scores, contributor_scores = ml_run(comparison_data, EPOCHSEXP, verb=1)
+                save_to_json(global_scores, contributor_scores, NAME)
+            else:
+                global_scores, contributor_scores = load_from_json(NAME)
 
+            # disp_one_by_line(global_scores[:10])
+            # disp_one_by_line(contributor_scores[:10])
+            # check_one(5600, global_scores, contributor_scores)
+            # check_one(5620, global_scores, contributor_scores)
+            # check_one(5667, global_scores, contributor_scores)
+            # check_one(7887, global_scores, contributor_scores)
+            # for c in global_scores:
+            #     if c[2]>3:
+            #         print(c)
+            print("global:", len(global_scores),"local:",  len(contributor_scores))
 
-        # seedall(2)
-        # global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:10000])
-        # save_data(global_scores, contributor_scores)
-        # disp_one_by_line(global_scores[:10])
-        # disp_one_by_line(contributor_scores[:15])
-        # check_one(5464, global_scores, contributor_scores)
-        # print("global:", len(global_scores),"local:",  len(contributor_scores))
-        global_scores, contributor_scores = ml_run(comparison_data)
-        save_data(global_scores, contributor_scores)
+# =================== PRODUCTION ========================
+        # just train all and predict if not experiment mode
+        else: 
+            comparison_data = fetch_data()
+            global_scores, local_scores = ml_run(comparison_data, EPOCHS, verb=0)
+            save_data(global_scores, local_scores)

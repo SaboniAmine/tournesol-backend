@@ -77,12 +77,11 @@ class Flower():
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
 
         self.opt = optim.SGD
-        all_lrs = 0.001 # temporary
         self.lr_node = 1     # local learning rate (local scores)
         self.lr_gen = 0.02  # global learning rate (global scores)
         self.lr_s = 0.01     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
-        self.w0 = 0.001       # regularisation strength
+        self.w0 = 0.01      # regularisation strength
         self.w = 0.1     # default weight for a node
 
         self.get_classifier = get_classifier # neural network to use
@@ -287,7 +286,7 @@ class Flower():
                         g = models_dist(self.models[n], 
                                         self.general_model, 
                                         self.pow_gen,
-                                        self.data[n][4]
+                                        self.data[n][4] # mask
                                         #None
                                         )
                         gen_loss += self.weights[n] * g  # generalisation term    
