@@ -53,7 +53,7 @@ USAGE:
 #                 "better_habits", "entertaining_relaxing"]
 
 CRITERIAS = ["reliability"]
-EPOCHS = 3
+
 
 
 def fetch_data():
@@ -126,6 +126,8 @@ def distribute_data(arr, gpu=False):
 
     return data_distrib, user_ids, dic
 
+
+
 def in_and_out(comparison_data, criteria):
     ''' 
     Trains models and returns video scores
@@ -138,7 +140,7 @@ def in_and_out(comparison_data, criteria):
     - (list of tensor of local vIDs , list of tensors of local video scores)
     - list of users IDs in same order as second output
     '''
-    one_crit = select_criteria(comparison_data[:20], criteria)
+    one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
     distributed, users_ids, dic = distribute_data(full_data)
     flow = get_flower(len(dic), dic)
@@ -149,6 +151,7 @@ def in_and_out(comparison_data, criteria):
     ar = np.asarray([tens.item() for tens in flow.s_nodes])
     print("ssssssssss", np.min(ar), np.max(ar))
     flow.check() # some tests
+    print("nb_nodes", flow.nb_nodes)
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
@@ -213,17 +216,32 @@ def save_data(global_scores, local_scores):
     """
     pass
 
+EPOCHS = 30
+TEST_DATA = [
+                [0, 100, 101, "reliability", 100, 0],
+                [0, 101, 110, "reliability", 100, 0],
+                [1, 102, 103, "reliability", 70, 0],
+                [2, 104, 105, "reliability", 50, 0],
+                [3, 106, 107, "reliability", 30, 0],
+                [4, 108, 109, "reliability", 0, 0],
+            ] + [[0, 555, 556, "reliability", 40, 0]] * 100 
+
 class Command(BaseCommand):
     help = 'Runs the ml'
 
     def handle(self, *args, **options):
         comparison_data = fetch_data()
-        seedall(1)
-        global_scores, contributor_scores = ml_run(comparison_data)
+        seedall(2)
+        global_scores, contributor_scores = ml_run(TEST_DATA) #+ comparison_data[:10000])
         save_data(global_scores, contributor_scores)
 
-        disp_one_by_line(global_scores[:10])
-        disp_one_by_line(contributor_scores[:10])
-        check_one(6094, global_scores, contributor_scores)
+        # disp_one_by_line(global_scores[:10])
+        disp_one_by_line(contributor_scores[:15])
+
+        # check_one(5753, global_scores, contributor_scores)
+        # check_one(5986, global_scores, contributor_scores)
+        # for score in contributor_scores:
+        #     if score[0]!=6874:
+        #         print(score)
 
         print("global:", len(global_scores),"local:",  len(contributor_scores))

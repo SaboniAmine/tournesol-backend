@@ -110,6 +110,7 @@ def node_local_loss(model, s, a_batch, b_batch, r_batch):
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
     return loss / len(a_batch) + s_loss(s)
+    #return loss  + s_loss(s)
 
 # to handle data (used in ml_train.py)
 def rescale_rating(rating):
