@@ -48,11 +48,11 @@ USAGE:
 """
 
 # global variables
-# CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
-#                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
-#                 "better_habits", "entertaining_relaxing"]
+CRITERIAS = [   "reliability", "importance", "engaging", "pedagogy", 
+                "layman_friendly", "diversity_inclusion", "backfire_risk", 
+                "better_habits", "entertaining_relaxing"]
 
-CRITERIAS = ["reliability"]
+#CRITERIAS = ["reliability"]
 
 
 
@@ -147,7 +147,7 @@ def in_and_out(comparison_data, criteria):
     flow.set_allnodes(distributed, users_ids)
     h = flow.train(EPOCHS, verb=2) # EPOCHS: global variable
     glob, loc = flow.output_scores()
-    disp_one_by_line(flow.s_nodes[:10])
+    disp_one_by_line(flow.s_nodes[:])
     ar = np.asarray([tens.item() for tens in flow.s_nodes])
     print("ssssssssss", np.min(ar), np.max(ar))
     flow.check() # some tests
@@ -216,32 +216,31 @@ def save_data(global_scores, local_scores):
     """
     pass
 
-EPOCHS = 30
+EPOCHS = 300
 TEST_DATA = [
-                [0, 100, 101, "reliability", 100, 0],
-                [0, 101, 110, "reliability", 100, 0],
-                [1, 102, 103, "reliability", 70, 0],
-                [2, 104, 105, "reliability", 50, 0],
-                [3, 106, 107, "reliability", 30, 0],
-                [4, 108, 109, "reliability", 0, 0],
-            ] + [[0, 555, 556, "reliability", 40, 0]] * 100 
+                # [0, 100, 101, "reliability", 100, 0],
+                # [0, 101, 110, "reliability", 0, 0],
+                # [1, 102, 103, "reliability", 70, 0],
+                # [2, 104, 105, "reliability", 50, 0],
+                # [3, 106, 107, "reliability", 30, 0],
+                # [4, 108, 109, "reliability", 0, 0],
+                # [5, 108, 109, "reliability", 100, 0],
+                # [5, 666, 667, "reliability", 100, 0],
+            ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 class Command(BaseCommand):
     help = 'Runs the ml'
 
     def handle(self, *args, **options):
         comparison_data = fetch_data()
-        seedall(2)
-        global_scores, contributor_scores = ml_run(TEST_DATA) #+ comparison_data[:10000])
-        save_data(global_scores, contributor_scores)
 
+
+        # seedall(2)
+        # global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:10000])
+        # save_data(global_scores, contributor_scores)
         # disp_one_by_line(global_scores[:10])
-        disp_one_by_line(contributor_scores[:15])
-
-        # check_one(5753, global_scores, contributor_scores)
-        # check_one(5986, global_scores, contributor_scores)
-        # for score in contributor_scores:
-        #     if score[0]!=6874:
-        #         print(score)
-
-        print("global:", len(global_scores),"local:",  len(contributor_scores))
+        # disp_one_by_line(contributor_scores[:15])
+        # check_one(5464, global_scores, contributor_scores)
+        # print("global:", len(global_scores),"local:",  len(contributor_scores))
+        global_scores, contributor_scores = ml_run(comparison_data)
+        save_data(global_scores, contributor_scores)

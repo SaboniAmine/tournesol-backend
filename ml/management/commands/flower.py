@@ -78,12 +78,12 @@ class Flower():
 
         self.opt = optim.SGD
         all_lrs = 0.001 # temporary
-        self.lr_node = 0.3     # local learning rate (local scores)
-        self.lr_gen = 0.0   # global learning rate (global scores)
+        self.lr_node = 1     # local learning rate (local scores)
+        self.lr_gen = 0.02  # global learning rate (global scores)
         self.lr_s = 0.01     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
-        self.w0 = 0       # regularisation strength
-        self.w = 0.0      # default weight for a node
+        self.w0 = 0.001       # regularisation strength
+        self.w = 0.1     # default weight for a node
 
         self.get_classifier = get_classifier # neural network to use
         self.general_model = self.get_classifier(nb_vids, gpu)
@@ -272,8 +272,8 @@ class Flower():
                         g = models_dist(self.models[n], 
                                         self.general_model, 
                                         self.pow_gen, 
-                                        #self.data[n][4] # mask
-                                        None
+                                        self.data[n][4] # mask
+                                        #None
                                         ) 
                         gen_loss +=  self.weights[n] * g  # generalisation term
                     fit_loss *= fit_scale
@@ -287,8 +287,8 @@ class Flower():
                         g = models_dist(self.models[n], 
                                         self.general_model, 
                                         self.pow_gen,
-                                       # self.data[n][4]
-                                        None
+                                        self.data[n][4]
+                                        #None
                                         )
                         gen_loss += self.weights[n] * g  # generalisation term    
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
