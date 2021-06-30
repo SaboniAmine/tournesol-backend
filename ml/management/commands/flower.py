@@ -78,7 +78,7 @@ class Flower():
 
         self.opt = optim.SGD
         self.lr_node = 1     # local learning rate (local scores)
-        self.lr_gen = 0.02  # global learning rate (global scores)
+        self.lr_gen = 0.4  # global learning rate (global scores)
         self.lr_s = 0.01     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
         self.w0 = 0.01      # regularisation strength

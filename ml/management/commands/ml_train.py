@@ -59,7 +59,7 @@ else:
     CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
                     "layman_friendly", "diversity_inclusion", "backfire_risk", 
                     "better_habits", "entertaining_relaxing"]
-    EPOCHS = 300
+    EPOCHS = 100
 
 
 
@@ -246,7 +246,7 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 TRAIN = True 
 NAME = ""
-EPOCHSEXP = 300
+EPOCHSEXP = 100
 class Command(BaseCommand):
     help = 'Runs the ml'
     save_to_pickle([],"a")
@@ -260,12 +260,12 @@ class Command(BaseCommand):
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
 
-            # disp_one_by_line(global_scores[:10])
-            # disp_one_by_line(contributor_scores[:10])
-            # check_one(5600, global_scores, contributor_scores)
-            # check_one(5620, global_scores, contributor_scores)
-            # check_one(5667, global_scores, contributor_scores)
-            # check_one(7887, global_scores, contributor_scores)
+            disp_one_by_line(global_scores[:10])
+            disp_one_by_line(contributor_scores[:10])
+            check_one(5600, global_scores, contributor_scores)
+            check_one(5620, global_scores, contributor_scores)
+            check_one(5667, global_scores, contributor_scores)
+            check_one(7887, global_scores, contributor_scores)
             # for c in global_scores:
             #     if c[2]>3:
             #         print(c)
