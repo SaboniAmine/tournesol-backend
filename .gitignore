@@ -1,4 +1,8 @@
 **__pycache__/
 .DS_Store
 venv 
+flower.p 
+flowera.p 
+global_scores.json 
+local_scores.json 
 

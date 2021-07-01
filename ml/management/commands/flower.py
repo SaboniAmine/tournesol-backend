@@ -8,7 +8,7 @@ from time import time
 
 from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
-
+from ml.management.commands.utilities import save_to_pickle, load_from_pickle
 """
 Machine Learning algorithm, used in "ml_train"
 
@@ -67,7 +67,7 @@ class Flower():
         .check
     '''
 
-    def __init__(self, nb_vids, dic, gpu=False, **kwargs):
+    def __init__(self, nb_vids, dic, crit, gpu=False, **kwargs):
         ''' 
         nb_vids: number of different videos rated by at least one contributor for this criteria
         dic: dictionnary of {vID: idx}
@@ -75,6 +75,7 @@ class Flower():
         self.nb_params = nb_vids  # number of parameters of the model(= nb of videos)
         self.dic = dic # {video ID : video index (for that criteria)}
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
+        self.criteria = crit # criteria learnt by this Flower
 
         self.opt = optim.SGD
         self.lr_node = 1     # local learning rate (local scores)
@@ -91,13 +92,19 @@ class Flower():
         self.opt_gen = self.opt(self.general_model.parameters(), lr=self.lr_gen)
         self.pow_gen = (1,1)  # choice of norms for Licchavi loss 
         self.pow_reg = (2,1)  # (internal power, external power)
-        self.data = []  # list of nodes, one being (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
-        self.models = []  # one model for each node
-        self.opt_nodes = [] # one optimizer for each model (1/node)
-        self.s_nodes = []   # s parameter for each node (represents notation style)
-        self.age = []          # number of epochs each node has been trained
-        self.user_ids = []     # id of each node (user IDs)
-        self.weights = []    # weight of each node
+        # self.data = []  # list of nodes, one being (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
+        # self.models = []  # one model for each node
+        # self.opt_nodes = [] # one optimizer for each model (1/node)
+        # self.s_nodes = []   # s parameter for each node (represents notation style)
+        # self.age = []          # number of epochs each node has been trained
+        # self.user_ids = []     # id of each node (user IDs)
+        # self.weights = []    # weight of each node
+
+        self.nodes = [] # list of tuples
+        # (0:userID, 1:vID1_batch, 2:vID2_batch, 3:rating_batch, 4:single_vIDs_batch
+        #   5: model, 6: s parameter, 7:optimizer, 8:weight, 9:age
+        # )
+
         self.nb_nodes = 0
 
         self.size = nb_params(self.general_model) / 10_000
@@ -112,23 +119,28 @@ class Flower():
                        ie list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
         users_id: list/array of users IDs in same order 
         '''
-        self.data = data_distrib
-        self.user_ids = user_ids
-        nb = len(self.data)
-
-        
-        self.weights = [self.w] * nb
-        self.age = [0] * nb
+        nb = len(data_distrib)
         self.nb_nodes = nb
-        self.models = [self.get_classifier(self.nb_params, self.gpu) for i in range(nb)]
-        self.s_nodes = [torch.ones(1, requires_grad=True) for n in range(nb)] # s is initialized at 1
-        self.opt_nodes = [self.opt( [
-                                    {'params': self.models[n].parameters()}, 
-                                    {'params': self.s_nodes[n], 'lr': self.lr_s},
-                                    ], lr=self.lr_node
-                                    ) for n in range(nb)]
-                            
-        
+        self.nodes = [  [id,        # 0: user id
+                        data[0],    # 1: video ID 1
+                        data[1],    # 2: video ID 2
+                        data[2],    # 3: score
+                        data[3],    # 4: 1D array of unique video IDs
+                        data[4],    # 5: mask
+                        torch.ones(1, requires_grad=True),  # 6: s parameter
+                        self.get_classifier(self.nb_params, self.gpu),  # 7: model
+                        None,   # 8: optimizer, added below
+                        self.w, # 9: weight
+                        0       # 10: age (nb of epochs node has been trained)
+                        ] for id, data in zip(user_ids, data_distrib) 
+                    ] # change list to tuple maybe
+                    
+        for n in range(nb):
+            self.nodes[n][8] = self.opt( [
+                                        {'params': self.nodes[n][7].parameters()}, 
+                                        {'params': self.nodes[n][6], 'lr': self.lr_s},
+                                        ], lr=self.lr_node
+                                    )
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
@@ -148,25 +160,31 @@ class Flower():
             mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
-            for n, node in enumerate(self.data):
-                input = one_hot_vids(self.dic, node[3])
-                output = self.models[n](input) 
+            for n, node in enumerate(self.nodes):
+                input = one_hot_vids(self.dic, node[4])
+                output = node[7](input) 
                 local_scores.append(output)
-                list_ids_batchs.append(node[3])
+                list_ids_batchs.append(node[4])
             vids_batch = list(self.dic.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
+
+    def save_models(self):
+        ''' saves global and local models to pickle '''
+        local_models = [(node[0], node[7], node[6]) for node in self.nodes] 
+        all_models = (self.criteria, self.general_model, local_models)
+        torch.save(all_models, "ml/models_weights")
 
     # ---------- methods for training ------------
     def _set_lr(self):
         ''' sets learning rates of optimizers according to Flower setting '''
         for n in range(self.nb_nodes): 
-            self.opt_nodes[n].param_groups[0]['lr'] = self.lr_node
+            self.nodes[n][8].param_groups[0]['lr'] = self.lr_node
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
 
     def _zero_opt(self):
         ''' resets gradients of all models '''
         for n in range(self.nb_nodes):
-            self.opt_nodes[n].zero_grad()      
+            self.nodes[n][8].zero_grad()      
         self.opt_gen.zero_grad()
 
     def _update_hist(self, epoch, fit, gen, reg, verb=1):
@@ -191,8 +209,8 @@ class Flower():
 
     def _old(self, years):
         ''' increments age of nodes (during training) '''
-        for i in range(self.nb_nodes):
-            self.age[i] += years
+        for n in range(self.nb_nodes):
+            self.nodes[n][10] += years
 
     def _counters(self, c_gen, c_fit):
         ''' updates internal training counters '''
@@ -207,7 +225,7 @@ class Flower():
         ''' step for appropriate optimizer(s) '''
         if fit_step:       # updating local or global alternatively
             for n in range(self.nb_nodes): 
-                self.opt_nodes[n].step()      
+                self.nodes[n][8].step()      
         else:
             self.opt_gen.step()  
 
@@ -223,8 +241,8 @@ class Flower():
         limit = 0.01
         with torch.no_grad():
             for n in range(self.nb_nodes):
-                if self.s_nodes[n] < limit:
-                    self.s_nodes[n][0] = limit
+                if self.nodes[n][6] < limit:
+                    self.nodes[n][6][0] = limit
 
     # ====================  TRAINING ================== 
 
@@ -266,45 +284,52 @@ class Flower():
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
+                    
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
-                        s = torch.ones(1)  # user notation style, constant for now
-                        fit_loss += node_local_loss(self.models[n], self.s_nodes[n],  
-                                                                    self.data[n][0],
-                                                                    self.data[n][1], 
-                                                                    self.data[n][2])
-                        g = models_dist(self.models[n], 
+                        #print("aAAAAAAAAAAAAAAAAA#AAAAAAAAAOINEONZMOEGNZMGJNGZJENN")
+                        fit_loss += node_local_loss(self.nodes[n][7],  # model
+                                                    self.nodes[n][6],  # s
+                                                    self.nodes[n][1],  # id_batch1
+                                                    self.nodes[n][2],  # id_batch2
+                                                    self.nodes[n][3])  # r_batch
+                        g = models_dist(self.nodes[n][7], 
                                         self.general_model, 
                                         self.pow_gen, 
-                                        self.data[n][4] # mask
+                                        self.nodes[n][5] # mask
                                         #None
                                         ) 
-                        gen_loss +=  self.weights[n] * g  # generalisation term
+                        gen_loss +=  self.nodes[n][9] * g  # generalisation term
+                        #print(g)
+                    #print(fit_loss, g)
                     fit_loss *= fit_scale
                     gen_loss *= gen_scale
+                    
                     loss = fit_loss + gen_loss 
                           
                 # only last 2 terms of loss updated 
                 else:        
                     gen_loss, reg_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
-                        g = models_dist(self.models[n], 
+                        g = models_dist(self.nodes[n][7], 
                                         self.general_model, 
                                         self.pow_gen,
-                                        self.data[n][4] # mask
+                                        self.nodes[n][5] # mask
                                         #None
                                         )
-                        gen_loss += self.weights[n] * g  # generalisation term    
+                        gen_loss += self.nodes[n][9] * g  # generalisation term    
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
                     reg_loss *= reg_scale
+                   
                     loss = gen_loss + reg_loss
 
                 total_out = round_loss(fit_loss + gen_loss + reg_loss)
                 if verb >= 2:
                     self._print_losses(total_out, fit_loss, gen_loss, reg_loss)
                 # Gradient descent 
+                print("loossososososoos", loss)
                 loss.backward() 
                 self._do_step(fit_step)   
  
@@ -320,20 +345,18 @@ class Flower():
     def check(self):
         ''' perform some tests on internal parameters adequation '''
         # population check
-        b1 =  (self.nb_nodes == len(self.data)  
-            == len(self.models) == len(self.opt_nodes) 
-            == len(self.weights) == len(self.age))
+        b1 =  (self.nb_nodes == len(self.nodes) == len(self.dic))
         # history check
         b2 = True
         for l in self.history:
-            b2 = b2 and (len(l) == len(self.history[0]) >= max(self.age))
+            b2 = b2 and (len(l) == len(self.history[0]))
         if (b1 and b2):
             print("No Problem")
         else:
             print("Coherency problem in Flower object ")
 
 
-def get_flower(nb_vids, dic, gpu=False, **kwargs):
+def get_flower(nb_vids, dic, crit, gpu=False, **kwargs):
     ''' get a Flower (ml decentralized structure)
     nb_vids: number of different videos rated by at least one contributor for this criteria
     dic: dictionnary of {vID: idx}
@@ -342,5 +365,5 @@ def get_flower(nb_vids, dic, gpu=False, **kwargs):
     #    return Flower(test_gpu, gpu=gpu, **kwargs)
     #else:
      #   return Flower(test, gpu=gpu, **kwargs)
-    return Flower(nb_vids, dic, gpu=gpu, **kwargs)
+    return Flower(nb_vids, dic, crit, gpu=gpu, **kwargs)
 

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import json
 import pickle 
-
+ 
 """
 Machine Learning utilies
 
@@ -132,8 +132,6 @@ def get_mask(batch1, batch2):
     to = torch.Tensor(b)
     return [to]
 
-
-
 def sort_by_first(arr):
     ''' sorts 2D array lines by first element of lines '''
     order = np.argsort(arr,axis=0)[:,0]
@@ -218,14 +216,14 @@ def load_from_json(suff=""):
         local_scores = json.load(f)
     return global_scores, local_scores
 
-def save_to_pickle(flower, suff=""):
+def save_to_pickle(obj, name="pickle"):
     ''' save python object to pickle file '''
-    filename = 'flower{}.p'.format(suff)
+    filename = '{}.p'.format(name)
     with open(filename, 'wb') as filehandler:
-        pickle.dump(flower, filehandler)
+        pickle.dump(obj, filehandler)
 
-def load_from_pickle(suff=""):
-    filename = 'flower{}.p'.format(suff)
+def load_from_pickle(name="pickle"):
+    filename = '{}.p'.format(name)
     with open(filename, 'rb') as filehandler:
-        flower = pickle.load(filehandler)
-    return flower
+        obj = pickle.load(filehandler)
+    return obj

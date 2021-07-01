@@ -27,12 +27,14 @@ Notations:
 - node = user : contributor
 - vid = vID : video, video ID
 - rating : rating provided by a contributor between 2 videos, in [0,100] or [-1,1]
-- score : score of a video outputted by the algorithm, range?
+- score : score of a video outputted by the algorithm, arround [-10, 10]
+- glob, loc : global, local
 - idx : index
 - l_someting : list of someting
 - arr : numpy array
 - tens : torch tensor
 - dic : dictionnary
+- verb : verbosity level
 - VARIABLE_NAME : global variable
 
 Structure:
@@ -101,7 +103,7 @@ def shape_data(l_ratings):
     arr = np.asarray(l_cleared)
     return arr
 
-def distribute_data(arr, gpu=False): 
+def distribute_data(arr, gpu=False): # change to add user ID to tuple
     ''' 
     Distributes data on nodes according to user IDs for one criteria
 
@@ -135,11 +137,9 @@ def distribute_data(arr, gpu=False):
 
     return data_distrib, user_ids, dic
 
-
-
 def in_and_out(comparison_data, criteria, epochs, verb=2):
     ''' 
-    Trains models and returns video scores
+    Trains models and returns video scores for one criteria
 
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
@@ -159,19 +159,19 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     #         print("5534", comp)
     full_data = shape_data(one_crit)
     distributed, users_ids, dic = distribute_data(full_data)
-    if new_training or not EXPERIMENT_MODE:
-        flow = get_flower(len(dic), dic)
-        flow.set_allnodes(distributed, users_ids)
-        h = flow.train(epochs, verb=verb) # EPOCHS: global variable
-    else:
-        flow = load_from_pickle()
+    # if new_training or not EXPERIMENT_MODE:
+    flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
+    flow.set_allnodes(distributed, users_ids)
+    h = flow.train(epochs, verb=verb) # EPOCHS: global variable
+    # else:
+    #     flow = load_from_pickle()
     glob, loc = flow.output_scores()
     if EXPERIMENT_MODE:
-        disp_one_by_line(flow.s_nodes[:5])
-        ar = np.asarray([tens.item() for tens in flow.s_nodes])
-        print("ssssssssss", np.min(ar), np.max(ar))
-        save_to_pickle(flow)
+        # disp_one_by_line(flow.s_nodes[:5])
+        # ar = np.asarray([tens.item() for tens in flow.s_nodes])
+        # print("ssssssssss", np.min(ar), np.max(ar))
         flow.check() # some tests
+        flow.save_models()
         print("nb_nodes", flow.nb_nodes)
     return glob, loc, users_ids
 
@@ -261,7 +261,7 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=0)
+                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=2)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
