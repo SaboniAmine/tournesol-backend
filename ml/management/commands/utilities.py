@@ -102,7 +102,8 @@ def fit_loss(s, ya, yb, r):
 
 def s_loss(s):
     ''' second term of local loss (for one node) '''
-    return (2 * s - torch.log(s))
+    #return (2 * s - torch.log(s))
+    return (2 * s**2 - torch.log(s))
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
     ''' fitting loss for one node, includes s_loss '''

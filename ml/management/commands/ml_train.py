@@ -51,7 +51,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = False
+EXPERIMENT_MODE = True
 
 if EXPERIMENT_MODE:
     CRITERIAS = ["reliability"]
@@ -151,6 +151,12 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     '''
     new_training = True
     one_crit = select_criteria(comparison_data, criteria)
+    # for comp in one_crit:
+    #     if comp[1]==5410 or comp[2]==5410:
+    #         print("5410", comp)
+    # for comp in one_crit:
+    #     if comp[1]==5534 or comp[2]==5534:
+    #         print("5534", comp)
     full_data = shape_data(one_crit)
     distributed, users_ids, dic = distribute_data(full_data)
     if new_training or not EXPERIMENT_MODE:
@@ -236,17 +242,17 @@ def save_data(global_scores, local_scores):
 TEST_DATA = [
                 [0, 100, 101, "reliability", 100, 0],
                 [0, 100, 101, "reliability", 100, 0],
-                [1, 100, 101, "reliability", 100, 0]
-                # [0, 101, 110, "reliability", 0, 0],
-                # [1, 102, 103, "reliability", 70, 0],
-                # [2, 104, 105, "reliability", 50, 0],
-                # [3, 106, 107, "reliability", 30, 0],
-                # [4, 108, 109, "reliability", 0, 0],
-                # [5, 109, 209, "reliability", 0, 0],
+                [1, 100, 101, "reliability", 100, 0],
+                [0, 101, 110, "reliability", 0, 0],
+                [1, 102, 103, "reliability", 70, 0],
+                [2, 104, 105, "reliability", 50, 0],
+                [3, 106, 107, "reliability", 30, 0],
+                [4, 108, 109, "reliability", 30, 0],
+                [5, 208, 209, "reliability", 0, 0]
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 TRAIN = True 
 NAME = ""
-EPOCHSEXP = 100
+EPOCHSEXP = 30
 class Command(BaseCommand):
     help = 'Runs the ml'
     save_to_pickle([],"a")
@@ -255,17 +261,17 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(comparison_data, EPOCHSEXP, verb=1)
+                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=0)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
 
             disp_one_by_line(global_scores[:10])
             disp_one_by_line(contributor_scores[:10])
-            check_one(5600, global_scores, contributor_scores)
-            check_one(5620, global_scores, contributor_scores)
-            check_one(5667, global_scores, contributor_scores)
-            check_one(7887, global_scores, contributor_scores)
+            check_one(5410, global_scores, contributor_scores)
+            # check_one(5620, global_scores, contributor_scores)
+            # check_one(5667, global_scores, contributor_scores)
+            # check_one(7887, global_scores, contributor_scores)
             # for c in global_scores:
             #     if c[2]>3:
             #         print(c)

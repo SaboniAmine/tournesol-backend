@@ -78,7 +78,7 @@ class Flower():
 
         self.opt = optim.SGD
         self.lr_node = 1     # local learning rate (local scores)
-        self.lr_gen = 0.4  # global learning rate (global scores)
+        self.lr_gen = 0.1  # global learning rate (global scores)
         self.lr_s = 0.01     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
         self.w0 = 0.01      # regularisation strength
@@ -139,25 +139,22 @@ class Flower():
         - (tensor of all vIDS , tensor of global video scores)
         - (list of tensor of local vIDs , list of tensors of local video scores)
         '''
-        mean_choice = 0 # where to center scores
         local_scores = []
         list_ids_batchs = []
         with torch.no_grad():
             for p in self.general_model.parameters():  # only one iteration   
                 glob_scores = p[0]
-            m = torch.mean(glob_scores) # mean of scores to unbias
             var = torch.var(glob_scores)
             mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
-            glob_scores2 = glob_scores #+ mean_choice - m # set mean 
             for n, node in enumerate(self.data):
                 input = one_hot_vids(self.dic, node[3])
-                output = self.models[n](input) #+ mean_choice - m
+                output = self.models[n](input) 
                 local_scores.append(output)
                 list_ids_batchs.append(node[3])
             vids_batch = list(self.dic.keys())
-        return (vids_batch, glob_scores2), (list_ids_batchs, local_scores)
+        return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     # ---------- methods for training ------------
     def _set_lr(self):
@@ -221,6 +218,14 @@ class Flower():
                 ', generalisation : ', round_loss(gen, 2),
                 ', regularisation : ', round_loss(reg, 2))
 
+    def _rectify_s(self):
+        ''' ensures that no s went under 0 '''
+        limit = 0.01
+        with torch.no_grad():
+            for n in range(self.nb_nodes):
+                if self.s_nodes[n] < limit:
+                    self.s_nodes[n][0] = limit
+
     # ====================  TRAINING ================== 
 
     def train(self, nb_epochs=None, verb=1):   
@@ -261,6 +266,7 @@ class Flower():
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
+                    #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
                         s = torch.ones(1)  # user notation style, constant for now
