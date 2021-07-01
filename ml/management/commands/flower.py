@@ -43,7 +43,6 @@ USAGE:
 
 """
 
-
 def get_classifier(nb_vids, gpu=False, zero_init=True):
     ''' returns one layer model for one-hot entries '''
     model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
@@ -92,24 +91,16 @@ class Flower():
         self.opt_gen = self.opt(self.general_model.parameters(), lr=self.lr_gen)
         self.pow_gen = (1,1)  # choice of norms for Licchavi loss 
         self.pow_reg = (2,1)  # (internal power, external power)
-        # self.data = []  # list of nodes, one being (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
-        # self.models = []  # one model for each node
-        # self.opt_nodes = [] # one optimizer for each model (1/node)
-        # self.s_nodes = []   # s parameter for each node (represents notation style)
-        # self.age = []          # number of epochs each node has been trained
-        # self.user_ids = []     # id of each node (user IDs)
-        # self.weights = []    # weight of each node
 
+
+        self.nb_nodes = 0
         self.nodes = [] # list of tuples
         # (0:userID, 1:vID1_batch, 2:vID2_batch, 3:rating_batch, 4:single_vIDs_batch
         #   5: model, 6: s parameter, 7:optimizer, 8:weight, 9:age
         # )
-
-        self.nb_nodes = 0
-
-        self.size = nb_params(self.general_model) / 10_000
+        # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
-        # self.h_legend = ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
+        # ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
         
     # ------------ input and output --------------------
     def set_allnodes(self, data_distrib, user_ids, verb=1):
@@ -257,12 +248,8 @@ class Flower():
         c_fit, c_gen = 0, 0
 
         const = 10  # just for visualisation (remove later)
-        # fit_scale = const / self.nb_nodes
-        # gen_scale = const / self.nb_nodes / self.size # self.weights is used addition
-        # reg_scale = const * self.w0 / self.size
-
         fit_scale = const 
-        gen_scale = const  # self.weights is used addition
+        gen_scale = const  # node weights are used in addition
         reg_scale = const * self.w0 
 
         reg_loss = reg_scale * model_norm(self.general_model, self.pow_reg)  
@@ -288,7 +275,6 @@ class Flower():
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for n in range(self.nb_nodes):   # for each node
-                        #print("aAAAAAAAAAAAAAAAAA#AAAAAAAAAOINEONZMOEGNZMGJNGZJENN")
                         fit_loss += node_local_loss(self.nodes[n][7],  # model
                                                     self.nodes[n][6],  # s
                                                     self.nodes[n][1],  # id_batch1
@@ -301,11 +287,8 @@ class Flower():
                                         #None
                                         ) 
                         gen_loss +=  self.nodes[n][9] * g  # generalisation term
-                        #print(g)
-                    #print(fit_loss, g)
                     fit_loss *= fit_scale
                     gen_loss *= gen_scale
-                    
                     loss = fit_loss + gen_loss 
                           
                 # only last 2 terms of loss updated 
@@ -318,18 +301,17 @@ class Flower():
                                         self.nodes[n][5] # mask
                                         #None
                                         )
-                        gen_loss += self.nodes[n][9] * g  # generalisation term    
+                        gen_loss += self.nodes[n][9] * g    
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
-                    reg_loss *= reg_scale
-                   
+                    reg_loss *= reg_scale       
                     loss = gen_loss + reg_loss
 
-                total_out = round_loss(fit_loss + gen_loss + reg_loss)
                 if verb >= 2:
+                    total_out = round_loss(fit_loss + gen_loss + reg_loss)
                     self._print_losses(total_out, fit_loss, gen_loss, reg_loss)
+                    
                 # Gradient descent 
-                print("loossososososoos", loss)
                 loss.backward() 
                 self._do_step(fit_step)   
  
@@ -339,7 +321,7 @@ class Flower():
              
         # ----------------- end of training -------------------------------  
         print("training time :", round(time() - time_train, 2)) 
-        return self.history
+        return self.history # self.train() returns lists of metrics
 
     # ------------ to check for problems --------------------------
     def check(self):
@@ -357,13 +339,11 @@ class Flower():
 
 
 def get_flower(nb_vids, dic, crit, gpu=False, **kwargs):
-    ''' get a Flower (ml decentralized structure)
+    ''' Returns a Flower (ml decentralized structure)
+
     nb_vids: number of different videos rated by at least one contributor for this criteria
     dic: dictionnary of {vID: idx}
+    crit: criteria of users ratingd
     '''
-   # if gpu:
-    #    return Flower(test_gpu, gpu=gpu, **kwargs)
-    #else:
-     #   return Flower(test, gpu=gpu, **kwargs)
     return Flower(nb_vids, dic, crit, gpu=gpu, **kwargs)
 
