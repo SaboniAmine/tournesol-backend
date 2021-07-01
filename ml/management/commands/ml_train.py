@@ -12,7 +12,7 @@ import torch
 
 from ml.management.commands.flower import get_flower
 from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
-from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask
+from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask, id_to_idx
 from ml.management.commands.utilities import save_to_json, load_from_json, save_to_pickle, load_from_pickle
 
 """
@@ -109,7 +109,7 @@ def distribute_data(arr, gpu=False):
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch, mask) (1/user)
+    - list of (vIDX1 list, vIDX2 list, ratings_batch, single_vIDs_batch, mask) (1/user)
     - list/array of users IDs in same order
     - dictionnary of {vID: video idx}
     '''
@@ -121,21 +121,21 @@ def distribute_data(arr, gpu=False):
     dic = reverse_idxs(vids)
     data_distrib = []    # futur list of data for each user
 
-    for i in range(len(first_of_each) - 1):
+    for i in range(len(first_of_each) - 1): # for each user
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
         l2 = node_arr[:,2]
-        batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(dic, l1)
+        batchvids = get_all_vids(node_arr) # unique video IDs rated by user
+        batch1 = one_hot_vids(dic, l1)  # to get mask (change in the future)
         batch2 = one_hot_vids(dic, l2)
         mask = get_mask(batch1, batch2)
+        l_idx1 = id_to_idx(dic, l1)
+        l_idx2 = id_to_idx(dic, l2)
         batchout = torch.FloatTensor(node_arr[:,3])
-        node = (batch1, batch2, batchout, batchvids, mask)
+        node = (l_idx1, l_idx2, batchout, batchvids, mask)
         data_distrib.append(node)
 
     return data_distrib, user_ids, dic
-
-
 
 def in_and_out(comparison_data, criteria, epochs, verb=2):
     ''' 
@@ -252,7 +252,7 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 TRAIN = True 
 NAME = ""
-EPOCHSEXP = 30
+EPOCHSEXP = 100
 class Command(BaseCommand):
     help = 'Runs the ml'
     save_to_pickle([],"a")
@@ -261,7 +261,7 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=0)
+                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)

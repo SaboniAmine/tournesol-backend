@@ -30,7 +30,7 @@ Usage:
 # metrics on models
 def extract_grad(model):
     ''' returns list of gradients of a model '''
-    l_grad =  [p.grad for p in model.parameters()]
+    l_grad =  [p.grad for p in [model]]
     return l_grad
 
 def sp(l_grad1, l_grad2):
@@ -40,9 +40,9 @@ def sp(l_grad1, l_grad2):
         s += (g1 * g2).sum()
     return round_loss(s, 4)
 
-def nb_params(model):
+def nb_params(tens):
     ''' returns number of parameters of a model '''
-    return sum(p.numel() for p in model.parameters())
+    return sum(p.numel() for p in [tens])  # simplify later
 
 def models_dist(model1, model2, pow=(1,1), mask=None):  
     ''' distance between 2 models (l1 by default)
@@ -51,18 +51,18 @@ def models_dist(model1, model2, pow=(1,1), mask=None):
     '''
     q, p = pow
     if mask is None:
-        mask = [torch.ones_like(param) for param in model1.parameters()]
+        mask = [torch.ones_like(param) for param in [model1]]  # simplify later
     dist = sum((((theta - rho) * coef)**q).abs().sum() for theta, rho, coef in 
-                  zip(model1.parameters(), model2.parameters(), mask))**p
+                  zip([model1], [model2], mask))**p  # simplify later
     return dist
 
-def model_norm(model, pow=(2,1)): 
+def model_norm(tens, pow=(2,1)): 
     ''' norm of a model (l2 squared by default)
 
      pow : (internal power, external power)
      '''
     q, p = pow
-    norm = sum((param**q).abs().sum() for param in model.parameters())**p
+    norm = sum((param**q).abs().sum() for param in tens)**p
     return norm
 
 def round_loss(tens, dec=0): 
@@ -72,14 +72,14 @@ def round_loss(tens, dec=0):
     else:
         return round(tens.item(), dec)
 
-def score(model, datafull):
-    ''' returns accuracy provided models, images and GTs '''
-    out = model(datafull[0])
-    predictions = torch.max(out, 1)[1]
-    c=0
-    for a, b in zip(predictions, datafull[1]):
-        c += int(a==b)
-    return c/len(datafull[0])
+# def score(model, datafull):
+#     ''' returns accuracy provided models, images and GTs '''
+#     out = model(datafull[0])
+#     predictions = torch.max(out, 1)[1]
+#     c=0
+#     for a, b in zip(predictions, datafull[1]):
+#         c += int(a==b)
+#     return c/len(datafull[0])
 
 # losses (used in flower.py)
 def fbbt(t,r):
@@ -102,13 +102,21 @@ def fit_loss(s, ya, yb, r):
 
 def s_loss(s):
     ''' second term of local loss (for one node) '''
-    #return (2 * s - torch.log(s))
-    return (2 * s**2 - torch.log(s))
+    return (2 * s - torch.log(s))
+    #return (2 * s**2 - torch.log(s))
+
+def predict_batch(tens, l_idx):
+    ''' from tensor of scores, list of video indexes, 
+    
+    Returns tensor of predictions with gradient function
+    '''
+    l_pred = [tens[idx:idx+1] for idx in l_idx]
+    return torch.cat(l_pred)
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
     ''' fitting loss for one node, includes s_loss '''
-    ya_batch = model(a_batch.float())
-    yb_batch = model(b_batch.float())
+    ya_batch = predict_batch(model, a_batch)
+    yb_batch = predict_batch(model, b_batch)
     loss = 0 
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
@@ -164,6 +172,10 @@ def one_hot_vids(dic, l_vid):
     for idx, vid in enumerate(l_vid):
         batch[idx][dic[vid]] = 1
     return batch
+
+def id_to_idx(dic, l_vid):
+    ''' replaces videos IDs by video indexes '''
+    return [dic[vid] for vid in l_vid]
 
 def reverse_idxs(vids):
     ''' Returns dictionnary of {vid: idx} '''

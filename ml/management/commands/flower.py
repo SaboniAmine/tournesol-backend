@@ -6,7 +6,7 @@ import torch.optim as optim
 from copy import deepcopy
 from time import time
 
-from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
+from ml.management.commands.utilities import extract_grad, id_to_idx, predict_batch, sp, nb_params, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
 
 """
@@ -44,13 +44,20 @@ USAGE:
 """
 
 
-def get_classifier(nb_vids, gpu=False, zero_init=True):
-    ''' returns one layer model for one-hot entries '''
-    model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
-    if zero_init:
-        with torch.no_grad():
-            for p in model.parameters():
-                _ = p.zero_()
+# def get_classifier(nb_vids, gpu=False, zero_init=True):
+#     ''' returns one layer model for one-hot entries '''
+#     model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
+#     if zero_init:
+#         with torch.no_grad():
+#             for p in model.parameters():
+#                 _ = p.zero_()
+#     if gpu:
+#         return model.cuda()
+#     return model
+
+def get_model(nb_vids, gpu=False, zero_init=True):
+    ''' returns a tensor of -nb_vids scores set to zero which requires gradients '''
+    model = torch.zeros(nb_vids, requires_grad=True)
     if gpu:
         return model.cuda()
     return model
@@ -84,11 +91,11 @@ class Flower():
         self.w0 = 0.01      # regularisation strength
         self.w = 0.1     # default weight for a node
 
-        self.get_classifier = get_classifier # neural network to use
-        self.general_model = self.get_classifier(nb_vids, gpu)
+        self.get_model = get_model # neural network to use
+        self.general_model = self.get_model(nb_vids, gpu)
         self.init_model = deepcopy(self.general_model) # saved for metrics
         self.last_grad = None
-        self.opt_gen = self.opt(self.general_model.parameters(), lr=self.lr_gen)
+        self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
         self.pow_gen = (1,1)  # choice of norms for Licchavi loss 
         self.pow_reg = (2,1)  # (internal power, external power)
         self.data = []  # list of nodes, one being (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
@@ -100,7 +107,7 @@ class Flower():
         self.weights = []    # weight of each node
         self.nb_nodes = 0
 
-        self.size = nb_params(self.general_model) / 10_000
+        # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
         # self.h_legend = ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
         
@@ -120,10 +127,10 @@ class Flower():
         self.weights = [self.w] * nb
         self.age = [0] * nb
         self.nb_nodes = nb
-        self.models = [self.get_classifier(self.nb_params, self.gpu) for i in range(nb)]
+        self.models = [self.get_model(self.nb_params, self.gpu) for i in range(nb)]
         self.s_nodes = [torch.ones(1, requires_grad=True) for n in range(nb)] # s is initialized at 1
         self.opt_nodes = [self.opt( [
-                                    {'params': self.models[n].parameters()}, 
+                                    {'params': self.models[n]}, 
                                     {'params': self.s_nodes[n], 'lr': self.lr_s},
                                     ], lr=self.lr_node
                                     ) for n in range(nb)]
@@ -142,15 +149,14 @@ class Flower():
         local_scores = []
         list_ids_batchs = []
         with torch.no_grad():
-            for p in self.general_model.parameters():  # only one iteration   
-                glob_scores = p[0]
+            glob_scores = self.general_model
             var = torch.var(glob_scores)
             mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
             for n, node in enumerate(self.data):
-                input = one_hot_vids(self.dic, node[3])
-                output = self.models[n](input) 
+                input = id_to_idx(self.dic, node[3])
+                output = predict_batch(self.models[n], input) 
                 local_scores.append(output)
                 list_ids_batchs.append(node[3])
             vids_batch = list(self.dic.keys())
