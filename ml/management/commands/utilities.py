@@ -30,7 +30,7 @@ Usage:
 # metrics on models
 def extract_grad(model):
     ''' returns list of gradients of a model '''
-    l_grad =  [p.grad for p in model.parameters()]
+    l_grad =  [p.grad for p in [model]]
     return l_grad
 
 def sp(l_grad1, l_grad2):
@@ -42,7 +42,7 @@ def sp(l_grad1, l_grad2):
 
 def nb_params(model):
     ''' returns number of parameters of a model '''
-    return sum(p.numel() for p in model.parameters())
+    return sum(p.numel() for p in [model])
 
 def models_dist(model1, model2, pow=(1,1), mask=None):  
     ''' distance between 2 models (l1 by default)
@@ -51,9 +51,9 @@ def models_dist(model1, model2, pow=(1,1), mask=None):
     '''
     q, p = pow
     if mask is None:
-        mask = [torch.ones_like(param) for param in model1.parameters()]
+        mask = [torch.ones_like(param) for param in [model1]]
     dist = sum((((theta - rho) * coef)**q).abs().sum() for theta, rho, coef in 
-                  zip(model1.parameters(), model2.parameters(), mask))**p
+                  zip([model1], [model2], mask))**p
     return dist
 
 def model_norm(model, pow=(2,1)): 
@@ -62,7 +62,7 @@ def model_norm(model, pow=(2,1)):
      pow : (internal power, external power)
      '''
     q, p = pow
-    norm = sum((param**q).abs().sum() for param in model.parameters())**p
+    norm = sum((param**q).abs().sum() for param in [model])**p
     return norm
 
 def round_loss(tens, dec=0): 
@@ -107,8 +107,8 @@ def s_loss(s):
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
     ''' fitting loss for one node, includes s_loss '''
-    ya_batch = model(a_batch.float())
-    yb_batch = model(b_batch.float())
+    ya_batch = torch.matmul(a_batch.float(), model)
+    yb_batch = torch.matmul(b_batch.float(), model)
     loss = 0 
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)

@@ -43,16 +43,23 @@ USAGE:
 
 """
 
-def get_classifier(nb_vids, gpu=False, zero_init=True):
-    ''' returns one layer model for one-hot entries '''
-    model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
-    if zero_init:
-        with torch.no_grad():
-            for p in model.parameters():
-                _ = p.zero_()
+# def get_classifier(nb_vids, gpu=False, zero_init=True):
+#     ''' returns one layer model for one-hot entries '''
+#     model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
+#     if zero_init:
+#         with torch.no_grad():
+#             for p in model.parameters():
+#                 _ = p.zero_()
+#     if gpu:
+#         return model.cuda()
+#     return model
+
+def get_model(nb_vids, gpu=False, zero_init=True):
+    model = torch.zeros(nb_vids, requires_grad=True)
     if gpu:
         return model.cuda()
     return model
+
 
 # nodes organisation
 class Flower():
@@ -84,11 +91,11 @@ class Flower():
         self.w0 = 0.01      # regularisation strength
         self.w = 0.1     # default weight for a node
 
-        self.get_classifier = get_classifier # neural network to use
-        self.general_model = self.get_classifier(nb_vids, gpu)
+        self.get_model = get_model # neural network to use
+        self.general_model = self.get_model(nb_vids, gpu)
         self.init_model = deepcopy(self.general_model) # saved for metrics
         self.last_grad = None
-        self.opt_gen = self.opt(self.general_model.parameters(), lr=self.lr_gen)
+        self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
         self.pow_gen = (1,1)  # choice of norms for Licchavi loss 
         self.pow_reg = (2,1)  # (internal power, external power)
 
@@ -119,7 +126,7 @@ class Flower():
                         data[3],    # 4: 1D array of unique video IDs
                         data[4],    # 5: mask
                         torch.ones(1, requires_grad=True),  # 6: s parameter
-                        self.get_classifier(self.nb_params, self.gpu),  # 7: model
+                        self.get_model(self.nb_params, self.gpu),  # 7: model
                         None,   # 8: optimizer, added below
                         self.w, # 9: weight
                         0       # 10: age (nb of epochs node has been trained)
@@ -128,7 +135,7 @@ class Flower():
                     
         for n in range(nb):
             self.nodes[n][8] = self.opt( [
-                                        {'params': self.nodes[n][7].parameters()}, 
+                                        {'params': self.nodes[n][7] }, 
                                         {'params': self.nodes[n][6], 'lr': self.lr_s},
                                         ], lr=self.lr_node
                                     )
@@ -145,24 +152,23 @@ class Flower():
         local_scores = []
         list_ids_batchs = []
         with torch.no_grad():
-            for p in self.general_model.parameters():  # only one iteration   
-                glob_scores = p[0]
+            glob_scores = self.general_model
             var = torch.var(glob_scores)
             mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
             for n, node in enumerate(self.nodes):
                 input = one_hot_vids(self.dic, node[4])
-                output = node[7](input) 
+                output = torch.matmul(input, node[7]) 
                 local_scores.append(output)
                 list_ids_batchs.append(node[4])
             vids_batch = list(self.dic.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     def save_models(self):
-        ''' saves global and local models to pickle '''
-        local_models = [(node[0], node[7], node[6]) for node in self.nodes] 
-        all_models = (self.criteria, self.general_model, local_models)
+        ''' saves global and local models '''
+        local_models = [(node[0], node[7].detach(), node[6]) for node in self.nodes] 
+        all_models = (self.criteria, self.general_model.detach(), local_models)
         torch.save(all_models, "ml/models_weights")
 
     # ---------- methods for training ------------
