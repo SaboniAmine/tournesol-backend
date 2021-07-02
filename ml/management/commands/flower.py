@@ -100,7 +100,7 @@ class Flower():
         
     # ------------ input and output --------------------
     def _get_default(self):
-        ''' Returns default model + '''
+        ''' Returns: - (default s, default model, default age) '''
         model_plus = (  torch.ones(1, requires_grad=True), 
                         self.get_model(self.nb_params, self.gpu),
                         0 #age
@@ -108,13 +108,21 @@ class Flower():
         return model_plus
 
     def _get_saved(self, loc_models_old, id, nb_new):
-        ''' get saved parameters updated or default '''
-        model = loc_models_old.get(id, self._get_default())
+        ''' Returns saved parameters updated or default 
+        
+        loc_models_old: saved parameters in dictionnary of tuples
+        id: id of node (user)
+        nb_new: number of new videos (since save)
+
+        Returns:
+        - (s, model, age), updated or default
+        '''
+        triple = loc_models_old.get(id, self._get_default())
         if id in loc_models_old.keys():
-            s, mod, age = model
+            s, mod, age = triple
             mod = expand_tens(mod, nb_new)
-            model = (s, mod, age)
-        return model
+            triple = (s, mod, age)
+        return triple
 
     def set_allnodes(self, data_dic, user_ids, verb=1):
         ''' Puts data in Flower and create a model for each node 
@@ -132,6 +140,32 @@ class Flower():
                                 self.w, # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}
         for node in self.nodes.values():
+            node[8] = self.opt( [   {'params': node[6]}, 
+                                    {'params': node[5], 'lr': self.lr_s},
+                                        ], lr=self.lr_node)
+        if verb:
+            print("Total number of nodes : {}".format(self.nb_nodes))
+
+    def load_and_update(self, data_dic, user_ids, verb=1):
+        ''' loads weights and expands them as required 
+
+        data_dic: dictionnary {userID: ()}
+        user_ids: list/array of user IDs
+        '''
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH)
+        nb_new = self.nb_params - len(dic_old) # number of new videos
+        self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
+        self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
+        self.users = user_ids
+        nbn = len(user_ids)
+        self.nb_nodes = nbn
+        
+        self.nodes = { id: [    *data, # 0 to 4: userID, vID1, vID2, r, masks
+                                *self._get_saved(loc_models_old, id, nb_new), # 5 to 7
+                                None, # 8: optimizer
+                                self.w # 9: weight
+                            ] for id, data in zip(user_ids, data_dic.values())}                   
+        for node in self.nodes.values(): # set optimizers
             node[8] = self.opt( [   {'params': node[6]}, 
                                     {'params': node[5], 'lr': self.lr_s},
                                         ], lr=self.lr_node)
@@ -162,7 +196,7 @@ class Flower():
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     def save_models(self):
-        ''' saves global and local weights, detached (no gradients) '''
+        ''' saves age and global and local weights, detached (no gradients) '''
         local_data = {id:  (node[5],            # s
                             node[6].detach(),   # model
                             node[7]            # age
@@ -174,41 +208,17 @@ class Flower():
                         )
         torch.save(saved_data, PATH)
 
-    def load_and_update(self, data_dic, user_ids, verb=1):
-        ''' loads weights and expands them as required 
-        nb_new: number of new videos
-        '''
-        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH)
-        nb_new = self.nb_params - len(dic_old) # number of new videos
-        self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
-        self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
-        self.users = user_ids
-        nbn = len(user_ids)
-        self.nb_nodes = nbn
-        
-        self.nodes = { id: [    *data, # 0 to 4
-                                *self._get_saved(loc_models_old, id, nb_new), # 5 to 7
-                                None, # 8: optimizer
-                                self.w # 9: weight
-                            ] for id, data in zip(user_ids, data_dic.values())}                   
-        for node in self.nodes.values(): # set optimizers
-            node[8] = self.opt( [   {'params': node[6]}, 
-                                    {'params': node[5], 'lr': self.lr_s},
-                                        ], lr=self.lr_node)
-        if verb:
-            print("Total number of nodes : {}".format(self.nb_nodes))
-
     # ---------- methods for training ------------
     def _set_lr(self):
         ''' sets learning rates of optimizers according to Flower setting '''
         for node in self.nodes.values(): 
-            node[8].param_groups[0]['lr'] = self.lr_node
+            node[8].param_groups[0]['lr'] = self.lr_node # node optimizer
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
 
     def _zero_opt(self):
         ''' resets gradients of all models '''
         for node in self.nodes.values():
-            node[8].zero_grad()      
+            node[8].zero_grad()  # node optimizer 
         self.opt_gen.zero_grad()
 
     def _update_hist(self, epoch, fit, gen, reg, verb=1):
@@ -234,7 +244,7 @@ class Flower():
     def _old(self, years):
         ''' increments age of nodes (during training) '''
         for node in self.nodes.values():
-            node[7] += years
+            node[7] += years 
 
     def _counters(self, c_gen, c_fit):
         ''' updates internal training counters '''
@@ -247,9 +257,9 @@ class Flower():
 
     def _do_step(self, fit_step):
         ''' step for appropriate optimizer(s) '''
-        if fit_step:       # updating local or global alternatively
+        if fit_step:  # updating local or global alternatively
             for node in self.nodes.values(): 
-                node[8].step()      
+                node[8].step() # node optimizer   
         else:
             self.opt_gen.step()  
 
@@ -265,7 +275,7 @@ class Flower():
         limit = 0.01
         with torch.no_grad():
             for node in self.nodes.values():
-                if node[5] < limit:
+                if node[5] < limit: # node[5] = s
                     node[5][0] = limit
 
     # ====================  TRAINING ================== 
@@ -300,11 +310,9 @@ class Flower():
                     print("step :", step, '/', nb_steps, txt)
                 self._zero_opt() # resetting gradients
 
-
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
-                    
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for node in self.nodes.values():  
@@ -317,7 +325,6 @@ class Flower():
                                         self.general_model, 
                                         self.pow_gen, 
                                         node[4] # mask
-                                        #None
                                         ) 
                         gen_loss +=  node[9] * g  # node weight  * generalisation term
                     fit_loss *= fit_scale
@@ -332,7 +339,6 @@ class Flower():
                                         self.general_model, 
                                         self.pow_gen,
                                         node[4] # mask
-                                        #None
                                         )
                         gen_loss += node[9] * g  # node weight  * generalisation term
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
@@ -343,16 +349,15 @@ class Flower():
 
                 if verb >= 2:
                     total_out = round_loss(fit_loss + gen_loss + reg_loss)
-                    self._print_losses(total_out, fit_loss, gen_loss, reg_loss)
-                    
+                    self._print_losses(total_out, fit_loss, gen_loss, reg_loss)           
                 # Gradient descent 
                 loss.backward() 
                 self._do_step(fit_step)   
- 
-            if verb: print("epoch time :", round(time() - time_ep, 2)) 
+
             self._update_hist(epoch, fit_loss, gen_loss, reg_loss, verb)
             self._old(1)  # aging all nodes of 1 epoch
-             
+            if verb: print("epoch time :", round(time() - time_ep, 2)) 
+
         # ----------------- end of training -------------------------------  
         print("training time :", round(time() - time_train, 2)) 
         return self.history # self.train() returns lists of metrics
@@ -376,7 +381,10 @@ def get_flower(nb_vids, dic, crit, gpu=False):
 
     nb_vids: number of different videos rated by at least one contributor for this criteria
     dic: dictionnary of {vID: idx}
-    crit: criteria of users ratingd
+    crit: criteria of users rating
+
+    Returns:
+    - Flower object with initialized global model and no local ones
     '''
     return Flower(nb_vids, dic, crit, gpu=gpu)
 

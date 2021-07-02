@@ -69,8 +69,7 @@ CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy",
                 "better_habits", "entertaining_relaxing"]
 
 def fetch_data():
-    """
-    Fetches the data from the Comparisons model
+    """ Fetches the data from the Comparisons model
 
     Returns:
     - comparison_data: list of [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str, score: float, weight: float]
@@ -82,7 +81,7 @@ def fetch_data():
     return comparison_data
 
 def select_criteria(comparison_data, crit):
-    ''' Extracts data for this criteria where score is not None 
+    ''' Extracts not None comparisons of one criteria
 
     comparison_data: output of fetch_data()
     crit: str, name of criteria
@@ -95,7 +94,8 @@ def select_criteria(comparison_data, crit):
     return l_ratings
 
 def shape_data(l_ratings):
-    ''' 
+    ''' Shapes data for distribute_data()/distribute_data_from_save()
+
     l_ratings : list of not None ratings for one criteria, all users
 
     Returns : one array with 4 columns : userID, vID1, vID2, rating ([-1,1]) 
@@ -105,14 +105,15 @@ def shape_data(l_ratings):
     return arr
 
 def distribute_data(arr, gpu=False): # change to add user ID to tuple
-    ''' 
-    Distributes data on nodes according to user IDs for one criteria
+    ''' Distributes data on nodes according to user IDs for one criteria
+        Output is not compatible with previously stored models, starts from scratch
 
-    arr : np 2D array of all ratings for all users for one criteria
+    arr: np 2D array of all ratings for all users for one criteria
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - list of (user ID, vID1_batch, vID2_batch, rating_batch, single_vIDs_batch, mask) (1/user)
+    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - array of user IDs
     - dictionnary of {vID: video idx}
     '''
     arr = sort_by_first(arr) # sorting by user IDs
@@ -120,24 +121,33 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
     first_of_each = list(first_of_each) # to be able to append
     first_of_each.append(len(arr)) # to have last index too
     vids = get_all_vids(arr)  # all unique video IDs
-    vid_vidx = reverse_idxs(vids)
+    vid_vidx = reverse_idxs(vids) # dictionnary of  {vID: video idx}
     nodes_dic = {}   # futur dictionnary of data for each user
 
     for i, id in enumerate(user_ids):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
-        l1 = node_arr[:,1]
-        l2 = node_arr[:,2]
+        vid1 = node_arr[:,1] # iterable of video IDs
+        vid2 = node_arr[:,2]
         batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(vid_vidx, l1)
-        batch2 = one_hot_vids(vid_vidx, l2)
+        batch1 = one_hot_vids(vid_vidx, vid1)
+        batch2 = one_hot_vids(vid_vidx, vid2)
         mask = get_mask(batch1, batch2)
         batchout = torch.FloatTensor(node_arr[:,3])
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
-
     return nodes_dic, user_ids, vid_vidx
 
 def distribute_data_from_save(arr, gpu=False):
+    ''' Distributes data on nodes according to user IDs for one criteria
+        Output is compatible with previously stored models
 
+    arr: np 2D array of all ratings for all users for one criteria
+            (one line is [userID, vID1, vID2, score])
+
+    Returns:
+    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - array of user IDs
+    - dictionnary of {vID: video idx}
+    '''
     _, dic_old, _, _ = torch.load(PATH) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
@@ -145,25 +155,23 @@ def distribute_data_from_save(arr, gpu=False):
     first_of_each = list(first_of_each) # to be able to append
     first_of_each.append(len(arr)) # to have last index too
     vids = get_all_vids(arr)  # all unique video IDs
-    vid_vidx = expand_dic(dic_old, vids) # updated dictionnary
+    vid_vidx = expand_dic(dic_old, vids) # update dictionnary
     nodes_dic = {}    # futur list of data for each user
 
     for i, id in enumerate(user_ids):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
-        l1 = node_arr[:,1]
-        l2 = node_arr[:,2]
+        vid1 = node_arr[:,1] # iterable of video IDs
+        vid2 = node_arr[:,2]
         batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(vid_vidx, l1)
-        batch2 = one_hot_vids(vid_vidx, l2)
+        batch1 = one_hot_vids(vid_vidx, vid1)
+        batch2 = one_hot_vids(vid_vidx, vid2)
         mask = get_mask(batch1, batch2)
         batchout = torch.FloatTensor(node_arr[:,3])
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
-
     return nodes_dic, user_ids, vid_vidx
 
 def in_and_out(comparison_data, criteria, epochs, verb=2):
-    ''' 
-    Trains models and returns video scores for one criteria
+    ''' Trains models and returns video scores for one criteria
 
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
@@ -175,13 +183,13 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     '''
     one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
-    if RESUME and EXPERIMENT_MODE:
-        nodes_dic, users_ids, dic = distribute_data_from_save(full_data)
-        flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
+    if RESUME:
+        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data)
+        flow = get_flower(len(vid_vidx), vid_vidx, criteria) 
         flow.load_and_update(nodes_dic, users_ids)
     else:
-        nodes_dic, users_ids, dic = distribute_data(full_data)
-        flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
+        nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
+        flow = get_flower(len(vid_vidx), vid_vidx, criteria)
         flow.set_allnodes(nodes_dic, users_ids)
     h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()
@@ -192,10 +200,9 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     return glob, loc, users_ids
 
 def format_out_glob(glob, crit):
-    ''' 
-    Puts data in list of global scores (one criteria)
+    ''' Puts data in list of global scores (one criteria)
     
-    glob: global scores in 2D tensor (1 line: [vID, score])
+    glob: (tensor of all vIDS , tensor of global video scores)
     crit: criteria
     
     Returns: 
@@ -209,11 +216,10 @@ def format_out_glob(glob, crit):
     return l_out
 
 def format_out_loc(loc, users_ids, crit):
-    ''' 
-    Puts data in list of local scores (one criteria)
+    ''' Puts data in list of local scores (one criteria)
 
-    loc: 
-    users_ids: list of user IDs in same order
+    loc: (list of tensor of local vIDs , list of tensors of local video scores)
+    users_ids: list/array of user IDs in same order
     
     Returns : 
     - list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
@@ -273,7 +279,7 @@ if EXPERIMENT_MODE:
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 2
+    EPOCHS = 20
     TRAIN = True 
     RESUME = True
     
@@ -285,24 +291,18 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(comparison_data[:10000], EPOCHS, verb=1)
+                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:1000], EPOCHS, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
                 
             disp_one_by_line(global_scores[:10])
             disp_one_by_line(contributor_scores[:10])
-            check_one(5410, global_scores, contributor_scores)
-            # check_one(5620, global_scores, contributor_scores)
-            # check_one(5667, global_scores, contributor_scores)
-            # check_one(7887, global_scores, contributor_scores)
-            # for c in global_scores:
-            #     if c[2]>3:
-            #         print(c)
+            check_one(100, global_scores, contributor_scores)
             print("global:", len(global_scores),"local:",  len(contributor_scores))
 
 # =================== PRODUCTION ========================
-        # just train all and predict if not experiment mode
+        # just train on all data and predict if not experiment mode
         else: 
             comparison_data = fetch_data()
             global_scores, local_scores = ml_run(comparison_data, EPOCHS, verb=0)
