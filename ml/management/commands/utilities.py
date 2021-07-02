@@ -81,6 +81,15 @@ def score(model, datafull):
         c += int(a==b)
     return c/len(datafull[0])
 
+def predict(input, tens):
+    ''' 
+    tens: tensor = model
+    input: tensor one-hot encoding video
+
+    Returns: -score of the video according to the model
+    '''
+    return torch.matmul(input.float(), tens)
+
 # losses (used in flower.py)
 def fbbt(t,r):
     ''' fbbt loss function '''
@@ -107,8 +116,10 @@ def s_loss(s):
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
     ''' fitting loss for one node, includes s_loss '''
-    ya_batch = torch.matmul(a_batch.float(), model)
-    yb_batch = torch.matmul(b_batch.float(), model)
+    # ya_batch = torch.matmul(a_batch.float(), model)
+    # yb_batch = torch.matmul(b_batch.float(), model)
+    ya_batch = predict(a_batch, model)
+    yb_batch = predict(b_batch, model)
     loss = 0 
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
@@ -127,9 +138,7 @@ def get_all_vids(arr):
 def get_mask(batch1, batch2):
     ''' get mask '''
     batch = batch1 + batch2
-    summed = np.sum(np.asarray(batch), axis=0) # CHANGE TO USE TORCH
-    b = summed!=0 # array of boolean (True if video on node)
-    to = torch.Tensor(b)
+    to = batch.sum(axis=0, dtype=bool)
     return [to]
 
 def sort_by_first(arr):
@@ -143,11 +152,10 @@ def one_hot_vid(dic, vid):
     dic: dictionnary of {vID: idx}
     vid: vID
 
-    Returns: 1D tensor with 0s and 1 only for video index
+    Returns: 1D boolesn tensor with 0s and 1 only for video index
     '''
-    nb_vid = len(dic)
-    tens = torch.zeros(nb_vid)
-    tens[dic[vid]] = 1
+    tens = torch.zeros(len(dic), dtype=bool)
+    tens[dic[vid]] = True
     return tens
 
 def one_hot_vids(dic, l_vid):
@@ -156,19 +164,19 @@ def one_hot_vids(dic, l_vid):
     dic: dictionnary of {vID: idx}
     vid: list of vID
 
-    Returns: 2D tensor with 1 line being 0s and 1 only for video index
+    Returns: 2D bollean tensor with one line being 0s and 1 only for video index
     '''
-    batch = torch.zeros(len(l_vid), len(dic))
+    batch = torch.zeros(len(l_vid), len(dic), dtype=bool)
     for idx, vid in enumerate(l_vid):
-        batch[idx][dic[vid]] = 1
+        batch[idx][dic[vid]] = True
     return batch
 
 def reverse_idxs(vids):
     ''' Returns dictionnary of {vid: idx} '''
-    dic = {}
+    vid_vidx = {}
     for idx, vid in enumerate(vids):
-        dic[vid] = idx
-    return dic 
+        vid_vidx[vid] = idx
+    return vid_vidx 
 
 # debug helpers
 def check_one(vid, comp_glob, comp_loc):
@@ -202,7 +210,7 @@ def tens_count(tens, val):
     return len(tens) - round_loss(torch.count_nonzero(tens-val))
 
 def expand_tens(tens, nb_new):
-    ''' 
+    ''' Expands a tensor to include scores for new videos
     
     tens: a detached tensor 
 
@@ -214,7 +222,8 @@ def expand_tens(tens, nb_new):
     return full
 
 def expand_dic(dic, l_vid_new):
-    ''' 
+    ''' Expands a dictionnary to include new videos IDs
+
     dic: dictionnary of {video ID: video idx}
     l_vid_new: int list of video ID
     

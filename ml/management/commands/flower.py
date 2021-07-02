@@ -8,7 +8,8 @@ from time import time
 
 from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
-from ml.management.commands.utilities import expand_tens
+from ml.management.commands.utilities import expand_tens, predict
+
 """
 Machine Learning algorithm, used in "ml_train"
 
@@ -155,7 +156,7 @@ class Flower():
             print("variance of global scores :", var.item())
             for node in self.nodes.values():
                 input = one_hot_vids(self.dic, node[3])
-                output = torch.matmul(input, node[6]) 
+                output = predict(input, node[6]) 
                 local_scores.append(output)
                 list_ids_batchs.append(node[3])
             vids_batch = list(self.dic.keys())
@@ -366,7 +367,6 @@ class Flower():
         b2 = True
         for l in self.history:
             b2 = b2 and (len(l) == len(self.history[0]))
-        print(b1, b2, self.nb_nodes ,len(self.nodes) , len(self.dic))
         if (b1 and b2):
             print("No Problem")
         else:

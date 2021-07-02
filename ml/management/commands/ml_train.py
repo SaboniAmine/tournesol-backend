@@ -54,6 +54,7 @@ USAGE:
 # global variables
 
 EXPERIMENT_MODE = True
+SAVE_PATH = "ml/models_weights"
 
 if EXPERIMENT_MODE:
     CRITERIAS = ["reliability"]
@@ -138,7 +139,7 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
 
 def distribute_data_from_save(arr, gpu=False):
 
-    _, dic_old, _, _ = torch.load("ml/models_weights") # loading previous data
+    _, dic_old, _, _ = torch.load(SAVE_PATH) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
     user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
@@ -271,7 +272,7 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 NAME = ""
-EPOCHSEXP = 10
+EPOCHSEXP = 60
 TRAIN = True 
 RESUME = True
 
@@ -282,7 +283,7 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(comparison_data[:1000], EPOCHSEXP, verb=1)
+                global_scores, contributor_scores = ml_run(comparison_data[:10000], EPOCHSEXP, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
