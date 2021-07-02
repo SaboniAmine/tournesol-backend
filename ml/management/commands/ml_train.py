@@ -8,7 +8,7 @@ from settings.settings import VIDEO_FIELDS
 
 import numpy as np
 import torch
-
+import os
 
 from ml.management.commands.flower import get_flower
 from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
@@ -55,15 +55,18 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = True
+EXPERIMENT_MODE = True  # False to compute all data
 
-SAVE_PATH = "ml/models_weights"
+FOLDER_PATH = "ml/checkpoints" 
+FILENAME = "models_weights"
+PATH = FOLDER_PATH + "/" + FILENAME
+os.makedirs(FOLDER_PATH, exist_ok=True)
+RESUME = True # wether to resume training or not
+
 EPOCHS = 100
 CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
                 "better_habits", "entertaining_relaxing"]
-RESUME = True
-
 
 def fetch_data():
     """
@@ -135,7 +138,7 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
 
 def distribute_data_from_save(arr, gpu=False):
 
-    _, dic_old, _, _ = torch.load(SAVE_PATH) # loading previous data
+    _, dic_old, _, _ = torch.load(PATH) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
     user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
@@ -270,7 +273,7 @@ if EXPERIMENT_MODE:
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 60
+    EPOCHS = 2
     TRAIN = True 
     RESUME = True
     

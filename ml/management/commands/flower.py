@@ -1,12 +1,11 @@
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+# import torch.nn as nn
+# import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from time import time
 
-from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
+from ml.management.commands.utilities import extract_grad, sp, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
 from ml.management.commands.utilities import expand_tens, predict
 
@@ -44,7 +43,9 @@ USAGE:
 
 """
 
-SAVE_PATH = "ml/models_weights"
+FOLDER_PATH = "ml/checkpoints" 
+FILENAME = "models_weights"
+PATH = FOLDER_PATH + "/" + FILENAME
 
 def get_model(nb_vids, gpu=False, zero_init=True):
     model = torch.zeros(nb_vids, requires_grad=True)
@@ -171,13 +172,13 @@ class Flower():
                         self.general_model.detach(), 
                         local_data
                         )
-        torch.save(saved_data, SAVE_PATH)
+        torch.save(saved_data, PATH)
 
     def load_and_update(self, data_dic, user_ids, verb=1):
         ''' loads weights and expands them as required 
         nb_new: number of new videos
         '''
-        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(SAVE_PATH)
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH)
         nb_new = self.nb_params - len(dic_old) # number of new videos
         self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
         self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
