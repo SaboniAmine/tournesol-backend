@@ -131,12 +131,12 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
         batchvids = get_all_vids(node_arr) # unique video IDs of node
         batch1 = one_hot_vids(vid_vidx, vid1)
         batch2 = one_hot_vids(vid_vidx, vid2)
-        mask = get_mask(batch1, batch2)
+        mask = get_mask(batch1, batch2) # which videos are rated by user
         batchout = torch.FloatTensor(node_arr[:,3])
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
     return nodes_dic, user_ids, vid_vidx
 
-def distribute_data_from_save(arr, gpu=False):
+def distribute_data_from_save(arr, crit, gpu=False):
     ''' Distributes data on nodes according to user IDs for one criteria
         Output is compatible with previously stored models
 
@@ -148,7 +148,7 @@ def distribute_data_from_save(arr, gpu=False):
     - array of user IDs
     - dictionnary of {vID: video idx}
     '''
-    _, dic_old, _, _ = torch.load(PATH) # loading previous data
+    _, dic_old, _, _ = torch.load(PATH + crit) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
     user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
@@ -165,12 +165,12 @@ def distribute_data_from_save(arr, gpu=False):
         batchvids = get_all_vids(node_arr) # unique video IDs of node
         batch1 = one_hot_vids(vid_vidx, vid1)
         batch2 = one_hot_vids(vid_vidx, vid2)
-        mask = get_mask(batch1, batch2)
+        mask = get_mask(batch1, batch2) # which videos are rated by user
         batchout = torch.FloatTensor(node_arr[:,3])
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
     return nodes_dic, user_ids, vid_vidx
 
-def in_and_out(comparison_data, criteria, epochs, verb=2):
+def in_and_out(comparison_data, crit, epochs, verb=2):
     ''' Trains models and returns video scores for one criteria
 
     comparison_data: output of fetch_data()
@@ -181,15 +181,15 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     - (list of tensor of local vIDs , list of tensors of local video scores)
     - list of users IDs in same order as second output
     '''
-    one_crit = select_criteria(comparison_data, criteria)
+    one_crit = select_criteria(comparison_data, crit)
     full_data = shape_data(one_crit)
     if RESUME:
-        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data)
-        flow = get_flower(len(vid_vidx), vid_vidx, criteria) 
+        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data, crit)
+        flow = get_flower(len(vid_vidx), vid_vidx, crit) 
         flow.load_and_update(nodes_dic, users_ids)
     else:
         nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
-        flow = get_flower(len(vid_vidx), vid_vidx, criteria)
+        flow = get_flower(len(vid_vidx), vid_vidx, crit)
         flow.set_allnodes(nodes_dic, users_ids)
     h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()

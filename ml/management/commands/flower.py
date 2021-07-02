@@ -152,7 +152,7 @@ class Flower():
         data_dic: dictionnary {userID: ()}
         user_ids: list/array of user IDs
         '''
-        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH)
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH + self.criteria)
         nb_new = self.nb_params - len(dic_old) # number of new videos
         self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
         self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
@@ -206,7 +206,7 @@ class Flower():
                         self.general_model.detach(), 
                         local_data
                         )
-        torch.save(saved_data, PATH)
+        torch.save(saved_data, PATH + self.criteria)
 
     # ---------- methods for training ------------
     def _set_lr(self):
