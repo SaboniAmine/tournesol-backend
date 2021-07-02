@@ -162,7 +162,7 @@ def distribute_data_from_save(arr, gpu=False):
 
     return nodes_dic, user_ids, vid_vidx
 
-def in_and_out(comparison_data, criteria, epochs, verb=2, resume=False):
+def in_and_out(comparison_data, criteria, epochs, verb=2):
     ''' 
     Trains models and returns video scores for one criteria
 
@@ -176,7 +176,7 @@ def in_and_out(comparison_data, criteria, epochs, verb=2, resume=False):
     '''
     one_crit = select_criteria(comparison_data, criteria)
     full_data = shape_data(one_crit)
-    if resume:
+    if RESUME and EXPERIMENT_MODE:
         nodes_dic, users_ids, dic = distribute_data_from_save(full_data)
         flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
         flow.load_and_update(nodes_dic, users_ids)
@@ -186,9 +186,9 @@ def in_and_out(comparison_data, criteria, epochs, verb=2, resume=False):
         flow.set_allnodes(nodes_dic, users_ids)
     h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()
+    flow.save_models()
     if EXPERIMENT_MODE:
         flow.check() # some tests
-        flow.save_models()
         print("nb_nodes", flow.nb_nodes)
     return glob, loc, users_ids
 
@@ -258,31 +258,35 @@ def save_data(global_scores, local_scores):
 # ============= for experiments only ========= production code below this
 TEST_DATA = [
                 [0, 100, 101, "reliability", 100, 0],
-                [0, 100, 101, "reliability", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
-                [0, 101, 110, "reliability", 0, 0],
-                [1, 102, 103, "reliability", 70, 0],
-                [2, 104, 105, "reliability", 50, 0],
-                [3, 106, 107, "reliability", 30, 0],
-                [4, 108, 109, "reliability", 30, 0],
-                [5, 208, 209, "reliability", 0, 0]
+                # [1, 100, 101, "reliability", 100, 0],
+                # [0, 101, 110, "reliability", 0, 0],
+                # [1, 102, 103, "reliability", 70, 0],
+                # [2, 104, 105, "reliability", 50, 0],
+                # [3, 106, 107, "reliability", 30, 0],
+                # [4, 108, 109, "reliability", 30, 0],
+                # [5, 208, 209, "reliability", 0, 0],
+                # [8, 200, 201, "reliability", 0, 0],
+                # [67, 200, 201, "reliability", 0, 0]
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
-TRAIN = True 
+
 NAME = ""
-EPOCHSEXP = 30
+EPOCHSEXP = 10
+TRAIN = True 
+RESUME = True
+
 class Command(BaseCommand):
     help = 'Runs the ml'
-    save_to_pickle([],"a")
     def handle(self, *args, **options):
         if EXPERIMENT_MODE: 
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:0], EPOCHSEXP, verb=1)
+                global_scores, contributor_scores = ml_run(comparison_data[:1000], EPOCHSEXP, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
-
+                
             disp_one_by_line(global_scores[:10])
             disp_one_by_line(contributor_scores[:10])
             check_one(5410, global_scores, contributor_scores)
@@ -297,6 +301,7 @@ class Command(BaseCommand):
 # =================== PRODUCTION ========================
         # just train all and predict if not experiment mode
         else: 
+            RESUME = False
             comparison_data = fetch_data()
             global_scores, local_scores = ml_run(comparison_data, EPOCHS, verb=0)
             save_data(global_scores, local_scores)

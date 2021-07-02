@@ -43,16 +43,7 @@ USAGE:
 
 """
 
-# def get_classifier(nb_vids, gpu=False, zero_init=True):
-#     ''' returns one layer model for one-hot entries '''
-#     model = nn.Sequential(nn.Linear(nb_vids, 1, bias=False))
-#     if zero_init:
-#         with torch.no_grad():
-#             for p in model.parameters():
-#                 _ = p.zero_()
-#     if gpu:
-#         return model.cuda()
-#     return model
+SAVE_PATH = "ml/models_weights"
 
 def get_model(nb_vids, gpu=False, zero_init=True):
     model = torch.zeros(nb_vids, requires_grad=True)
@@ -73,7 +64,7 @@ class Flower():
         .check
     '''
 
-    def __init__(self, nb_vids, dic, crit, gpu=False, **kwargs):
+    def __init__(self, nb_vids, dic, crit, gpu=False):
         ''' 
         nb_vids: number of different videos rated by at least one contributor for this criteria
         dic: dictionnary of {vID: idx}
@@ -84,9 +75,10 @@ class Flower():
         self.criteria = crit # criteria learnt by this Flower
 
         self.opt = optim.SGD
-        self.lr_node = 1     # local learning rate (local scores)
-        self.lr_gen = 0.1  # global learning rate (global scores)
-        self.lr_s = 0.01     # local learning rate for s parameter
+        speed = 1
+        self.lr_node = speed*0.5     # local learning rate (local scores)
+        self.lr_s = speed*0.01     # local learning rate for s parameter
+        self.lr_gen = speed*0.1  # global learning rate (global scores)
         self.gen_freq = 1  # generalisation frequency (>=1)
         self.w0 = 0.01      # regularisation strength
         self.w = 0.1    # default weight for a node
@@ -99,12 +91,9 @@ class Flower():
         self.pow_gen = (1,1)  # choice of norms for Licchavi loss 
         self.pow_reg = (2,1)  # (internal power, external power)
 
-
         self.nb_nodes = 0
-        self.nodes = [] # list of tuples
-        # (0:userID, 1:vID1_batch, 2:vID2_batch, 3:rating_batch, 4:single_vIDs_batch
-        #   5: model, 6: s parameter, 7:optimizer, 8:weight, 9:age
-        # )
+        self.nodes = [] # list of lists
+
         # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
         # ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
@@ -120,7 +109,7 @@ class Flower():
 
     def _get_saved(self, loc_models_old, id, nb_new):
         ''' get saved parameters updated or default '''
-        model = loc_models_old.get(id, self.get_default())
+        model = loc_models_old.get(id, self._get_default())
         if id in loc_models_old.keys():
             s, mod, age = model
             mod = expand_tens(mod, nb_new)
@@ -183,15 +172,16 @@ class Flower():
                         self.general_model.detach(), 
                         local_data
                         )
-        torch.save(saved_data, "ml/models_weights")
+        torch.save(saved_data, SAVE_PATH)
 
     def load_and_update(self, data_dic, user_ids, verb=1):
         ''' loads weights and expands them as required 
         nb_new: number of new videos
         '''
-        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load("ml/models_weights")
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(SAVE_PATH)
         nb_new = self.nb_params - len(dic_old) # number of new videos
         self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
+        self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
         self.users = user_ids
         nbn = len(user_ids)
         self.nb_nodes = nbn
@@ -349,6 +339,7 @@ class Flower():
                     gen_loss *= gen_scale
                     reg_loss *= reg_scale       
                     loss = gen_loss + reg_loss
+                    # print(self.general_model)
 
                 if verb >= 2:
                     total_out = round_loss(fit_loss + gen_loss + reg_loss)
@@ -382,12 +373,12 @@ class Flower():
             print("Coherency problem in Flower object ")
 
 
-def get_flower(nb_vids, dic, crit, gpu=False, **kwargs):
+def get_flower(nb_vids, dic, crit, gpu=False):
     ''' Returns a Flower (ml decentralized structure)
 
     nb_vids: number of different videos rated by at least one contributor for this criteria
     dic: dictionnary of {vID: idx}
     crit: criteria of users ratingd
     '''
-    return Flower(nb_vids, dic, crit, gpu=gpu, **kwargs)
+    return Flower(nb_vids, dic, crit, gpu=gpu)
 
