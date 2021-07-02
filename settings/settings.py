@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_prometheus',
     'core',
     'tournesol',
     'oauth2_provider',
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'core.user'
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -73,6 +75,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 ROOT_URLCONF = 'settings.urls'
@@ -101,12 +104,12 @@ WSGI_APPLICATION = 'settings.wsgi.application'
 
 DATABASES = OrderedDict([
     ['default', {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django_prometheus.db.backends.postgresql',
         'NAME': 'DATABASE_NAME' in server_settings and server_settings['DATABASE_NAME'] or 'tournesol',
         'USER': 'DATABASE_USER' in server_settings and server_settings['DATABASE_USER'] or 'postgres',
         'PASSWORD': 'DATABASE_PASSWORD' in server_settings and server_settings['DATABASE_PASSWORD'] or '',
         'HOST': "DATABASE_HOST" in server_settings and server_settings["DATABASE_HOST"] or 'localhost',
-        'PORT': 9000,
+        'PORT': "DATABASE_PORT" in server_settings and server_settings["DATABASE_PORT"] or 5432,
         'NUMBER': 42
     }]
 ])
