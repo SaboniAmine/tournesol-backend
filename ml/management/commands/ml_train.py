@@ -55,15 +55,15 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = True  # False to compute all data
+EXPERIMENT_MODE = False  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints" 
 FILENAME = "models_weights"
 PATH = FOLDER_PATH + "/" + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
-RESUME = True # wether to resume training or not
+RESUME = False # wether to resume training or not
 
-EPOCHS = 100
+EPOCHS = 50
 CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
                 "layman_friendly", "diversity_inclusion", "backfire_risk", 
                 "better_habits", "entertaining_relaxing"]
@@ -263,10 +263,10 @@ def save_data(global_scores, local_scores):
 # ============= for experiments only ========= production code below this
 
 if EXPERIMENT_MODE:
-    CRITERIAS = ["reliability"]
+    CRITERIAS = ["reliability", "importance"]
     TEST_DATA = [
                     [0, 100, 101, "reliability", 100, 0],
-                    [1, 100, 101, "reliability", 100, 0],
+                    [1, 100, 101, "importance", 100, 0],
                     # [1, 100, 101, "reliability", 100, 0],
                     # [0, 101, 110, "reliability", 0, 0],
                     # [1, 102, 103, "reliability", 70, 0],
@@ -279,7 +279,7 @@ if EXPERIMENT_MODE:
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 20
+    EPOCHS = 1
     TRAIN = True 
     RESUME = True
     
