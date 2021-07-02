@@ -45,7 +45,9 @@ Structure:
 - these 3 are called by Django at the end of this file
 
 USAGE:
-- define global variables EPOCHS and CRITERIAS
+- define global variables EPOCHS, CRITERIAS
+- set EXPERIMENT_MODE to False
+- set RESUME to True if you want to use previously trained models 
 -- EPOCHS: number of training epochs
 -- CRITERIAS: list of str (there is one training for each criteria)
 - call ml_run(fetch_data()) if you just want the scores in python
@@ -54,18 +56,13 @@ USAGE:
 # global variables
 
 EXPERIMENT_MODE = True
+
 SAVE_PATH = "ml/models_weights"
-
-if EXPERIMENT_MODE:
-    CRITERIAS = ["reliability"]
-else:
-    CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
-                    "layman_friendly", "diversity_inclusion", "backfire_risk", 
-                    "better_habits", "entertaining_relaxing"]
-    EPOCHS = 100
-
-
-
+EPOCHS = 100
+CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
+                "layman_friendly", "diversity_inclusion", "backfire_risk", 
+                "better_habits", "entertaining_relaxing"]
+RESUME = True
 
 
 def fetch_data():
@@ -123,7 +120,6 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
     vid_vidx = reverse_idxs(vids)
     nodes_dic = {}   # futur dictionnary of data for each user
 
-    # for i in range(len(first_of_each) - 1):
     for i, id in enumerate(user_ids):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
@@ -149,7 +145,6 @@ def distribute_data_from_save(arr, gpu=False):
     vid_vidx = expand_dic(dic_old, vids) # updated dictionnary
     nodes_dic = {}    # futur list of data for each user
 
-    #for i in range(len(first_of_each) - 1):
     for i, id in enumerate(user_ids):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
@@ -257,24 +252,28 @@ def save_data(global_scores, local_scores):
 
 
 # ============= for experiments only ========= production code below this
-TEST_DATA = [
-                [0, 100, 101, "reliability", 100, 0],
-                [1, 100, 101, "reliability", 100, 0],
-                # [1, 100, 101, "reliability", 100, 0],
-                # [0, 101, 110, "reliability", 0, 0],
-                # [1, 102, 103, "reliability", 70, 0],
-                # [2, 104, 105, "reliability", 50, 0],
-                # [3, 106, 107, "reliability", 30, 0],
-                # [4, 108, 109, "reliability", 30, 0],
-                # [5, 208, 209, "reliability", 0, 0],
-                # [8, 200, 201, "reliability", 0, 0],
-                # [67, 200, 201, "reliability", 0, 0]
-            ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
-NAME = ""
-EPOCHSEXP = 60
-TRAIN = True 
-RESUME = True
+if EXPERIMENT_MODE:
+    CRITERIAS = ["reliability"]
+    TEST_DATA = [
+                    [0, 100, 101, "reliability", 100, 0],
+                    [1, 100, 101, "reliability", 100, 0],
+                    # [1, 100, 101, "reliability", 100, 0],
+                    # [0, 101, 110, "reliability", 0, 0],
+                    # [1, 102, 103, "reliability", 70, 0],
+                    # [2, 104, 105, "reliability", 50, 0],
+                    # [3, 106, 107, "reliability", 30, 0],
+                    # [4, 108, 109, "reliability", 30, 0],
+                    # [5, 208, 209, "reliability", 0, 0],
+                    # [8, 200, 201, "reliability", 0, 0],
+                    # [67, 200, 201, "reliability", 0, 0]
+                ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
+
+    NAME = ""
+    EPOCHS = 60
+    TRAIN = True 
+    RESUME = True
+    
 
 class Command(BaseCommand):
     help = 'Runs the ml'
@@ -283,7 +282,7 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(comparison_data[:10000], EPOCHSEXP, verb=1)
+                global_scores, contributor_scores = ml_run(comparison_data[:10000], EPOCHS, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
@@ -302,7 +301,6 @@ class Command(BaseCommand):
 # =================== PRODUCTION ========================
         # just train all and predict if not experiment mode
         else: 
-            RESUME = False
             comparison_data = fetch_data()
             global_scores, local_scores = ml_run(comparison_data, EPOCHS, verb=0)
             save_data(global_scores, local_scores)

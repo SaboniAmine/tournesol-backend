@@ -52,7 +52,6 @@ def get_model(nb_vids, gpu=False, zero_init=True):
         return model.cuda()
     return model
 
-
 # nodes organisation
 class Flower():
     ''' Training structure including local models and general one 
@@ -64,7 +63,6 @@ class Flower():
         .display
         .check
     '''
-
     def __init__(self, nb_vids, dic, crit, gpu=False):
         ''' 
         nb_vids: number of different videos rated by at least one contributor for this criteria
@@ -371,7 +369,6 @@ class Flower():
             print("No Problem")
         else:
             print("Coherency problem in Flower object ")
-
 
 def get_flower(nb_vids, dic, crit, gpu=False):
     ''' Returns a Flower (ml decentralized structure)
