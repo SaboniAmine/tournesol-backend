@@ -1,5 +1,6 @@
 
 from os import EX_NOPERM
+from tournesol.models.video import ComparisonCriteriaScore
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
@@ -75,9 +76,8 @@ def fetch_data():
     - comparison_data: list of [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str, score: float, weight: float]
     """
     comparison_data = [
-        [comparison.user_id, comparison.video_1_id, comparison.video_2_id, criteria, getattr(comparison, criteria), getattr(comparison, f"{criteria}_weight")]
-        for comparison in Comparison.objects.all() for criteria in VIDEO_FIELDS
-        if hasattr(comparison, criteria)]
+        [ccs.comparison.user_id, ccs.comparison.video_1_id, ccs.comparison.video_2_id, ccs.criteria, ccs.score, ccs.weight]
+        for ccs in ComparisonCriteriaScore.objects.all().prefetch_related("comparison") ]
     return comparison_data
 
 def select_criteria(comparison_data, crit):
