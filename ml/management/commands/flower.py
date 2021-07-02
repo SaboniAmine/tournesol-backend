@@ -8,7 +8,7 @@ from time import time
 
 from ml.management.commands.utilities import extract_grad, sp, nb_params, models_dist
 from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
-from ml.management.commands.utilities import save_to_pickle, load_from_pickle
+from ml.management.commands.utilities import expand_tens
 """
 Machine Learning algorithm, used in "ml_train"
 
@@ -89,7 +89,7 @@ class Flower():
         self.lr_s = 0.01     # local learning rate for s parameter
         self.gen_freq = 1  # generalisation frequency (>=1)
         self.w0 = 0.01      # regularisation strength
-        self.w = 0.1     # default weight for a node
+        self.w = 0.1    # default weight for a node
 
         self.get_model = get_model # neural network to use
         self.general_model = self.get_model(nb_vids, gpu)
@@ -110,35 +110,42 @@ class Flower():
         # ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
         
     # ------------ input and output --------------------
-    def set_allnodes(self, data_distrib, user_ids, verb=1):
+    def _get_default(self):
+        ''' Returns default model + '''
+        model_plus = (  torch.ones(1, requires_grad=True), 
+                        self.get_model(self.nb_params, self.gpu),
+                        0 #age
+                        )
+        return model_plus
+
+    def _get_saved(self, loc_models_old, id, nb_new):
+        ''' get saved parameters updated or default '''
+        model = loc_models_old.get(id, self.get_default())
+        if id in loc_models_old.keys():
+            s, mod, age = model
+            mod = expand_tens(mod, nb_new)
+            model = (s, mod, age)
+        return model
+
+    def set_allnodes(self, data_dic, user_ids, verb=1):
         ''' Puts data in Flower and create a model for each node 
         
         data_distrib: data distributed by ml_train.distribute_data() 
                        ie list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
         users_id: list/array of users IDs in same order 
         '''
-        nb = len(data_distrib)
+        nb = len(data_dic)
         self.nb_nodes = nb
-        self.nodes = [  [id,        # 0: user id
-                        data[0],    # 1: video ID 1
-                        data[1],    # 2: video ID 2
-                        data[2],    # 3: score
-                        data[3],    # 4: 1D array of unique video IDs
-                        data[4],    # 5: mask
-                        torch.ones(1, requires_grad=True),  # 6: s parameter
-                        self.get_model(self.nb_params, self.gpu),  # 7: model
-                        None,   # 8: optimizer, added below
-                        self.w, # 9: weight
-                        0       # 10: age (nb of epochs node has been trained)
-                        ] for id, data in zip(user_ids, data_distrib) 
-                    ] # change list to tuple maybe
-                    
-        for n in range(nb):
-            self.nodes[n][8] = self.opt( [
-                                        {'params': self.nodes[n][7] }, 
-                                        {'params': self.nodes[n][6], 'lr': self.lr_s},
-                                        ], lr=self.lr_node
-                                    )
+        self.users = user_ids
+        self.nodes = { id:  [   *data, # 0 to 4: vID1, vID2, r, vIDs, mask
+                                *self._get_default(), # 5 to 7: s, model, age
+                                None,  # 8: optimizer
+                                self.w, # 9: weight
+                            ] for id, data in zip(user_ids, data_dic.values())}
+        for node in self.nodes.values():
+            node[8] = self.opt( [   {'params': node[6]}, 
+                                    {'params': node[5], 'lr': self.lr_s},
+                                        ], lr=self.lr_node)
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
@@ -157,31 +164,61 @@ class Flower():
             mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
-            for n, node in enumerate(self.nodes):
-                input = one_hot_vids(self.dic, node[4])
-                output = torch.matmul(input, node[7]) 
+            for node in self.nodes.values():
+                input = one_hot_vids(self.dic, node[3])
+                output = torch.matmul(input, node[6]) 
                 local_scores.append(output)
-                list_ids_batchs.append(node[4])
+                list_ids_batchs.append(node[3])
             vids_batch = list(self.dic.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     def save_models(self):
-        ''' saves global and local models '''
-        local_models = [(node[0], node[7].detach(), node[6]) for node in self.nodes] 
-        all_models = (self.criteria, self.general_model.detach(), local_models)
-        torch.save(all_models, "ml/models_weights")
+        ''' saves global and local weights, detached (no gradients) '''
+        local_data = {id:  (node[5],            # s
+                            node[6].detach(),   # model
+                            node[7]            # age
+                        ) for id, node in self.nodes.items()}
+        saved_data = (  self.criteria,
+                        self.dic,
+                        self.general_model.detach(), 
+                        local_data
+                        )
+        torch.save(saved_data, "ml/models_weights")
+
+    def load_and_update(self, data_dic, user_ids, verb=1):
+        ''' loads weights and expands them as required 
+        nb_new: number of new videos
+        '''
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load("ml/models_weights")
+        nb_new = self.nb_params - len(dic_old) # number of new videos
+        self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
+        self.users = user_ids
+        nbn = len(user_ids)
+        self.nb_nodes = nbn
+        
+        self.nodes = { id: [    *data, # 0 to 4
+                                *self._get_saved(loc_models_old, id, nb_new), # 5 to 7
+                                None, # 8: optimizer
+                                self.w # 9: weight
+                            ] for id, data in zip(user_ids, data_dic.values())}                   
+        for node in self.nodes.values(): # set optimizers
+            node[8] = self.opt( [   {'params': node[6]}, 
+                                    {'params': node[5], 'lr': self.lr_s},
+                                        ], lr=self.lr_node)
+        if verb:
+            print("Total number of nodes : {}".format(self.nb_nodes))
 
     # ---------- methods for training ------------
     def _set_lr(self):
         ''' sets learning rates of optimizers according to Flower setting '''
-        for n in range(self.nb_nodes): 
-            self.nodes[n][8].param_groups[0]['lr'] = self.lr_node
+        for node in self.nodes.values(): 
+            node[8].param_groups[0]['lr'] = self.lr_node
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
 
     def _zero_opt(self):
         ''' resets gradients of all models '''
-        for n in range(self.nb_nodes):
-            self.nodes[n][8].zero_grad()      
+        for node in self.nodes.values():
+            node[8].zero_grad()      
         self.opt_gen.zero_grad()
 
     def _update_hist(self, epoch, fit, gen, reg, verb=1):
@@ -206,8 +243,8 @@ class Flower():
 
     def _old(self, years):
         ''' increments age of nodes (during training) '''
-        for n in range(self.nb_nodes):
-            self.nodes[n][10] += years
+        for node in self.nodes.values():
+            node[7] += years
 
     def _counters(self, c_gen, c_fit):
         ''' updates internal training counters '''
@@ -221,8 +258,8 @@ class Flower():
     def _do_step(self, fit_step):
         ''' step for appropriate optimizer(s) '''
         if fit_step:       # updating local or global alternatively
-            for n in range(self.nb_nodes): 
-                self.nodes[n][8].step()      
+            for node in self.nodes.values(): 
+                node[8].step()      
         else:
             self.opt_gen.step()  
 
@@ -237,9 +274,9 @@ class Flower():
         ''' ensures that no s went under 0 '''
         limit = 0.01
         with torch.no_grad():
-            for n in range(self.nb_nodes):
-                if self.nodes[n][6] < limit:
-                    self.nodes[n][6][0] = limit
+            for node in self.nodes.values():
+                if node[5] < limit:
+                    node[5][0] = limit
 
     # ====================  TRAINING ================== 
 
@@ -280,19 +317,19 @@ class Flower():
                     
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
-                    for n in range(self.nb_nodes):   # for each node
-                        fit_loss += node_local_loss(self.nodes[n][7],  # model
-                                                    self.nodes[n][6],  # s
-                                                    self.nodes[n][1],  # id_batch1
-                                                    self.nodes[n][2],  # id_batch2
-                                                    self.nodes[n][3])  # r_batch
-                        g = models_dist(self.nodes[n][7], 
+                    for node in self.nodes.values():  
+                        fit_loss += node_local_loss(node[6],  # model
+                                                    node[5],  # s
+                                                    node[0],  # id_batch1
+                                                    node[1],  # id_batch2
+                                                    node[2])  # r_batch
+                        g = models_dist(node[6], # model
                                         self.general_model, 
                                         self.pow_gen, 
-                                        self.nodes[n][5] # mask
+                                        node[4] # mask
                                         #None
                                         ) 
-                        gen_loss +=  self.nodes[n][9] * g  # generalisation term
+                        gen_loss +=  node[9] * g  # node weight  * generalisation term
                     fit_loss *= fit_scale
                     gen_loss *= gen_scale
                     loss = fit_loss + gen_loss 
@@ -300,14 +337,14 @@ class Flower():
                 # only last 2 terms of loss updated 
                 else:        
                     gen_loss, reg_loss = 0, 0
-                    for n in range(self.nb_nodes):   # for each node
-                        g = models_dist(self.nodes[n][7], 
+                    for node in self.nodes.values():   
+                        g = models_dist(node[6], # model
                                         self.general_model, 
                                         self.pow_gen,
-                                        self.nodes[n][5] # mask
+                                        node[4] # mask
                                         #None
                                         )
-                        gen_loss += self.nodes[n][9] * g    
+                        gen_loss += node[9] * g  # node weight  * generalisation term
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
                     reg_loss *= reg_scale       
@@ -333,11 +370,12 @@ class Flower():
     def check(self):
         ''' perform some tests on internal parameters adequation '''
         # population check
-        b1 =  (self.nb_nodes == len(self.nodes) == len(self.dic))
+        b1 =  (self.nb_nodes == len(self.nodes))
         # history check
         b2 = True
         for l in self.history:
             b2 = b2 and (len(l) == len(self.history[0]))
+        print(b1, b2, self.nb_nodes ,len(self.nodes) , len(self.dic))
         if (b1 and b2):
             print("No Problem")
         else:

@@ -201,6 +201,33 @@ def tens_count(tens, val):
     ''' counts nb of -val in tensor -tens '''
     return len(tens) - round_loss(torch.count_nonzero(tens-val))
 
+def expand_tens(tens, nb_new):
+    ''' 
+    
+    tens: a detached tensor 
+
+    Returns:
+    - expanded tensor requiring gradients
+    '''
+    full = torch.cat([tens, torch.zeros(nb_new)])
+    full.requires_grad=True
+    return full
+
+def expand_dic(dic, l_vid_new):
+    ''' 
+    dic: dictionnary of {video ID: video idx}
+    l_vid_new: int list of video ID
+    
+    Returns:
+    - dictionnary of {video ID: video idx} updated (bigger)
+    '''
+    idx = len(dic)
+    for vid_new in l_vid_new:
+        if vid_new not in dic:
+            dic[vid_new] = idx
+            idx += 1
+    return dic
+
 def save_to_json(global_scores, local_scores, suff=""):
     ''' saves scores in json files '''
     with open("global_scores{}.json".format(suff), 'w') as f:

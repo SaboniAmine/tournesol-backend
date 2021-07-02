@@ -14,7 +14,7 @@ from ml.management.commands.flower import get_flower
 from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
 from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask
 from ml.management.commands.utilities import save_to_json, load_from_json, save_to_pickle, load_from_pickle
-
+from ml.management.commands.utilities import expand_dic
 """
 Machine Learning main python file
 
@@ -111,33 +111,58 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch, mask) (1/user)
-    - list/array of users IDs in same order
+    - list of (user ID, vID1_batch, vID2_batch, rating_batch, single_vIDs_batch, mask) (1/user)
     - dictionnary of {vID: video idx}
     '''
     arr = sort_by_first(arr) # sorting by user IDs
-    user_ids , first_of_each = np.unique(arr[:,0], return_index=True)
-    first_of_each = list(first_of_each)
+    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
+    first_of_each = list(first_of_each) # to be able to append
     first_of_each.append(len(arr)) # to have last index too
     vids = get_all_vids(arr)  # all unique video IDs
-    dic = reverse_idxs(vids)
-    data_distrib = []    # futur list of data for each user
+    vid_vidx = reverse_idxs(vids)
+    nodes_dic = {}   # futur dictionnary of data for each user
 
-    for i in range(len(first_of_each) - 1):
+    # for i in range(len(first_of_each) - 1):
+    for i, id in enumerate(user_ids):
         node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
         l1 = node_arr[:,1]
         l2 = node_arr[:,2]
         batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(dic, l1)
-        batch2 = one_hot_vids(dic, l2)
+        batch1 = one_hot_vids(vid_vidx, l1)
+        batch2 = one_hot_vids(vid_vidx, l2)
         mask = get_mask(batch1, batch2)
         batchout = torch.FloatTensor(node_arr[:,3])
-        node = (batch1, batch2, batchout, batchvids, mask)
-        data_distrib.append(node)
+        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
 
-    return data_distrib, user_ids, dic
+    return nodes_dic, user_ids, vid_vidx
 
-def in_and_out(comparison_data, criteria, epochs, verb=2):
+def distribute_data_from_save(arr, gpu=False):
+
+    _, dic_old, _, _ = torch.load("ml/models_weights") # loading previous data
+
+    arr = sort_by_first(arr) # sorting by user IDs
+    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
+    first_of_each = list(first_of_each) # to be able to append
+    first_of_each.append(len(arr)) # to have last index too
+    vids = get_all_vids(arr)  # all unique video IDs
+    vid_vidx = expand_dic(dic_old, vids) # updated dictionnary
+    nodes_dic = {}    # futur list of data for each user
+
+    #for i in range(len(first_of_each) - 1):
+    for i, id in enumerate(user_ids):
+        node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
+        l1 = node_arr[:,1]
+        l2 = node_arr[:,2]
+        batchvids = get_all_vids(node_arr) # unique video IDs of node
+        batch1 = one_hot_vids(vid_vidx, l1)
+        batch2 = one_hot_vids(vid_vidx, l2)
+        mask = get_mask(batch1, batch2)
+        batchout = torch.FloatTensor(node_arr[:,3])
+        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
+
+    return nodes_dic, user_ids, vid_vidx
+
+def in_and_out(comparison_data, criteria, epochs, verb=2, resume=False):
     ''' 
     Trains models and returns video scores for one criteria
 
@@ -149,27 +174,19 @@ def in_and_out(comparison_data, criteria, epochs, verb=2):
     - (list of tensor of local vIDs , list of tensors of local video scores)
     - list of users IDs in same order as second output
     '''
-    new_training = True
     one_crit = select_criteria(comparison_data, criteria)
-    # for comp in one_crit:
-    #     if comp[1]==5410 or comp[2]==5410:
-    #         print("5410", comp)
-    # for comp in one_crit:
-    #     if comp[1]==5534 or comp[2]==5534:
-    #         print("5534", comp)
     full_data = shape_data(one_crit)
-    distributed, users_ids, dic = distribute_data(full_data)
-    # if new_training or not EXPERIMENT_MODE:
-    flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
-    flow.set_allnodes(distributed, users_ids)
-    h = flow.train(epochs, verb=verb) # EPOCHS: global variable
-    # else:
-    #     flow = load_from_pickle()
+    if resume:
+        nodes_dic, users_ids, dic = distribute_data_from_save(full_data)
+        flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
+        flow.load_and_update(nodes_dic, users_ids)
+    else:
+        nodes_dic, users_ids, dic = distribute_data(full_data)
+        flow = get_flower(len(dic), dic, criteria) # dic: {video ID: video index}
+        flow.set_allnodes(nodes_dic, users_ids)
+    h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()
     if EXPERIMENT_MODE:
-        # disp_one_by_line(flow.s_nodes[:5])
-        # ar = np.asarray([tens.item() for tens in flow.s_nodes])
-        # print("ssssssssss", np.min(ar), np.max(ar))
         flow.check() # some tests
         flow.save_models()
         print("nb_nodes", flow.nb_nodes)
