@@ -5,6 +5,7 @@ flowera.p
 global_scores.json 
 local_scores.json 
 venv/
+/ml/checkpoints/
 .flake8/
 .pylint/
 .pytest/
