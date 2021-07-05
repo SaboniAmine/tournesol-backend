@@ -1,20 +1,20 @@
 import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
-import torch.optim as optim
 from copy import deepcopy
 from time import time
 
-from ml.management.commands.utilities import extract_grad, sp, models_dist
-from ml.management.commands.utilities import model_norm, round_loss, node_local_loss, one_hot_vids
-from ml.management.commands.utilities import expand_tens, predict
+from ml.management.commands.metrics import extract_grad, sp
+from ml.management.commands.losses import model_norm, round_loss, models_dist
+from ml.management.commands.handle_data import expand_tens, one_hot_vids
+from ml.management.commands.losses import node_local_loss, predict
 
 """
 Machine Learning algorithm, used in "ml_train"
 
 Organisation:
 - ML model and decentralised structure are here
-- Data is handled in "ml_train"
+- Data is handled in "ml_train.py"
 - some helpful small functions are in "utilities.py"
 
 
@@ -74,7 +74,7 @@ class Flower():
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
         self.criteria = crit # criteria learnt by this Flower
 
-        self.opt = optim.SGD
+        self.opt = torch.optim.SGD
         speed = 1
         self.lr_node = speed*0.5     # local learning rate (local scores)
         self.lr_s = speed*0.01     # local learning rate for s parameter

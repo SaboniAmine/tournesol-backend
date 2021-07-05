@@ -12,10 +12,10 @@ import torch
 import os
 
 from ml.management.commands.flower import get_flower
-from ml.management.commands.utilities import rescale_rating, sort_by_first, one_hot_vids, get_all_vids
-from ml.management.commands.utilities import reverse_idxs, disp_one_by_line, seedall, check_one, get_mask
-from ml.management.commands.utilities import save_to_json, load_from_json, save_to_pickle, load_from_pickle
-from ml.management.commands.utilities import expand_dic
+from ml.management.commands.handle_data import rescale_rating, sort_by_first, one_hot_vids
+from ml.management.commands.handle_data import reverse_idxs, get_mask, get_all_vids
+from ml.management.commands.handle_data import save_to_json, load_from_json, expand_dic
+from ml.management.commands.visualisation import disp_one_by_line, seedall, check_one
 """
 Machine Learning main python file
 
@@ -56,7 +56,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = False  # False to compute all data
+EXPERIMENT_MODE = True  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints" 
 FILENAME = "models_weights"
