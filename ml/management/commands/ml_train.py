@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import os
 
-from .flower import get_flower
+from .licchavi import get_licchavi
 from .handle_data import select_criteria, shape_data
 from .handle_data import distribute_data, distribute_data_from_save
 from .handle_data import format_out_loc, format_out_glob
@@ -22,7 +22,7 @@ Machine Learning main python file
 
 Organisation:
 - Data is handled here
-- ML model and decentralised structure are in "flower.py"
+- ML model and decentralised structure are in "licchavi.py"
 - some helpful small functions are in "utilities.py"
 
 Notations:
@@ -97,11 +97,11 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
     full_data = shape_data(one_crit)
     if RESUME:
         nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data, crit, PATH)
-        flow = get_flower(len(vid_vidx), vid_vidx, crit) 
+        flow = get_licchavi(len(vid_vidx), vid_vidx, crit) 
         flow.load_and_update(nodes_dic, users_ids)
     else:
         nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
-        flow = get_flower(len(vid_vidx), vid_vidx, crit)
+        flow = get_licchavi(len(vid_vidx), vid_vidx, crit)
         flow.set_allnodes(nodes_dic, users_ids)
     h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()
@@ -123,7 +123,7 @@ def ml_run(comparison_data, epochs, verb=2):
     global_scores, local_scores = [], []
     for crit in CRITERIAS:
         print("\nPROCESSING", crit)
-        glob, loc, users_ids = in_and_out(comparison_data, crit, epochs, verb) # training, see "flower.py"
+        glob, loc, users_ids = in_and_out(comparison_data, crit, epochs, verb) # training, see "licchavi.py"
         # putting in required shape for output
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
@@ -177,11 +177,6 @@ def save_data(video_scores, contributor_rating_scores):
         )
         for contributor_id, video_id, criteria, score, uncertainty in contributor_rating_scores
     ])
-
-    
-
-
-    
 
 
 # ============= for experiments only ========= production code below this

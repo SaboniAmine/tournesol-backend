@@ -4,7 +4,6 @@ import torch
 from copy import deepcopy
 from time import time
 
-
 from .losses import model_norm, round_loss, models_dist
 from .losses import node_local_loss, predict
 from .metrics import extract_grad, sp
@@ -31,16 +30,16 @@ Notations:
 - dic : dictionnary
 
 Structure:
-- Flower class is the structure designed to include
+- Licchavi class is the structure designed to include
     a global model and one for each node
--- read Flower __init__ comments to better understand
+-- read Licchavi __init__ comments to better understand
 
 USAGE:
-- hardcode training hyperparameters in Flower __init__
-- use get_flower() to get an empty Flower
-- use Flower.set_allnodes() to populate nodes
-- use Flower.train() to train the models
-- use Flower.output_scores() to get the results
+- hardcode training hyperparameters in Licchavi __init__
+- use get_licchavi() to get an empty Licchavi
+- use Licchavi.set_allnodes() to populate nodes
+- use Licchavi.train() to train the models
+- use Licchavi.output_scores() to get the results
 
 """
 
@@ -55,7 +54,7 @@ def get_model(nb_vids, gpu=False, zero_init=True):
     return model
 
 # nodes organisation
-class Flower():
+class Licchavi():
     ''' Training structure including local models and general one 
         Allowing to add and remove nodes at will
         .pop
@@ -73,7 +72,7 @@ class Flower():
         self.nb_params = nb_vids  # number of parameters of the model(= nb of videos)
         self.dic = dic # {video ID : video index (for that criteria)}
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
-        self.criteria = crit # criteria learnt by this Flower
+        self.criteria = crit # criteria learnt by this Licchavi
 
         self.opt = torch.optim.SGD
         speed = 1
@@ -126,7 +125,7 @@ class Flower():
         return triple
 
     def set_allnodes(self, data_dic, user_ids, verb=1):
-        ''' Puts data in Flower and create a model for each node 
+        ''' Puts data in Licchavi and create a model for each node 
         
         data_distrib: data distributed by ml_train.distribute_data() 
                        ie list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
@@ -211,7 +210,7 @@ class Flower():
 
     # ---------- methods for training ------------
     def _set_lr(self):
-        ''' sets learning rates of optimizers according to Flower setting '''
+        ''' sets learning rates of optimizers according to Licchavi setting '''
         for node in self.nodes.values(): 
             node[8].param_groups[0]['lr'] = self.lr_node # node optimizer
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
@@ -375,17 +374,17 @@ class Flower():
         if (b1 and b2):
             print("No Problem")
         else:
-            print("Coherency problem in Flower object ")
+            print("Coherency problem in Licchavi object ")
 
-def get_flower(nb_vids, dic, crit, gpu=False):
-    ''' Returns a Flower (ml decentralized structure)
+def get_licchavi(nb_vids, dic, crit, gpu=False):
+    ''' Returns a Licchavi (ml decentralized structure)
 
     nb_vids: number of different videos rated by at least one contributor for this criteria
     dic: dictionnary of {vID: idx}
     crit: criteria of users rating
 
     Returns:
-    - Flower object with initialized global model and no local ones
+    - Licchavi object with initialized global model and no local ones
     '''
-    return Flower(nb_vids, dic, crit, gpu=gpu)
+    return Licchavi(nb_vids, dic, crit, gpu=gpu)
 

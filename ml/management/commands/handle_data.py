@@ -2,8 +2,7 @@ import numpy as np
 import torch
 
 from .data_utility import rescale_rating, sort_by_first, one_hot_vids
-from .data_utility import reverse_idxs, get_mask, get_all_vids
-from .data_utility import save_to_json, load_from_json, expand_dic
+from .data_utility import reverse_idxs, get_mask, get_all_vids, expand_dic
 
 
 def select_criteria(comparison_data, crit):
