@@ -6,6 +6,8 @@ from .losses import model_norm, round_loss, models_dist
 from .losses import node_local_loss, predict
 from .metrics import extract_grad, sp
 from .data_utility import expand_tens, one_hot_vids
+from .visualisation import disp_one_by_line
+
 
 """
 Machine Learning algorithm, used in "ml_train"
@@ -70,7 +72,7 @@ class Licchavi():
         self.opt = torch.optim.SGD
         speed = 1
         self.lr_node = speed*0.5     # local learning rate (local scores)
-        self.lr_s = speed*0.01     # local learning rate for s parameter
+        self.lr_s = speed*0.0001     # local learning rate for s parameter
         self.lr_gen = speed*0.1  # global learning rate (global scores)
         self.gen_freq = 1  # generalisation frequency (>=1)
         self.w0 = 0.01      # regularisation strength
@@ -133,8 +135,9 @@ class Licchavi():
                                 self.w, # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}
         for node in self.nodes.values():
+            lrs = self.lr_s / len(node[0])
             node[8] = self.opt( [   {'params': node[6]}, 
-                                    {'params': node[5], 'lr': self.lr_s},
+                                    {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
@@ -159,8 +162,9 @@ class Licchavi():
                                 self.w # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}                   
         for node in self.nodes.values(): # set optimizers
+            lrs = self.lr_s / len(node[0])
             node[8] = self.opt( [   {'params': node[6]}, 
-                                    {'params': node[5], 'lr': self.lr_s},
+                                    {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
@@ -200,6 +204,24 @@ class Licchavi():
                         local_data
                         )
         torch.save(saved_data, fullpath)
+    # --------- utility --------------
+    def _all_nodes(self, key):
+        ''' get a generator of one parameter for all nodes '''
+        dic = {"userid": 0, "vid1": 1, "vid2": 2, "r": 3, "vids": 4, 
+                "s": 5, "model": 6, "age": 7, "opt": 8, "age": 9}
+        idx = dic[key]
+        for node in self.nodes.values():
+            yield node[idx]
+    
+    def stat_s(self):
+        ''' returns array of s values '''
+        l_s = [(round_loss(s, 2), id) for s, id in zip(self._all_nodes("s"), self.nodes.keys())]
+        tens = torch.tensor(l_s)
+        disp_one_by_line(l_s)
+        tens = tens[:,0]
+        print("mean of s: ", round_loss(torch.mean(tens), 2))
+        print("min and max of s: ", round_loss(torch.min(tens), 2), round_loss(torch.max(tens), 2))
+        print("var of s: ", round_loss(torch.var(tens), 2))
 
     # ---------- methods for training ------------
     def _set_lr(self):
@@ -265,7 +287,7 @@ class Licchavi():
 
     def _rectify_s(self):
         ''' ensures that no s went under 0 '''
-        limit = 0.01
+        limit = 0.1
         with torch.no_grad():
             for node in self.nodes.values():
                 if node[5] < limit: # node[5] = s

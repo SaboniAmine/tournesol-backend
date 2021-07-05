@@ -111,6 +111,7 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
     if EXPERIMENT_MODE:
         flow.check() # some tests
         print("nb_nodes", flow.nb_nodes)
+        flow.stat_s()
     return glob, loc, users_ids
 
 def ml_run(comparison_data, epochs, verb=2):
@@ -198,7 +199,7 @@ if EXPERIMENT_MODE:
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 100
+    EPOCHS = 30
     TRAIN = True 
     RESUME = True
     
@@ -207,13 +208,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if EXPERIMENT_MODE: 
             if TRAIN:
-                seedall(2)
+                seedall(3)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:000], EPOCHS, verb=1)
+                global_scores, contributor_scores = ml_run(comparison_data[:], EPOCHS, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
-                
+            for c in contributor_scores:
+                if c[0]==6213:
+                    print(c)
             disp_one_by_line(global_scores[:10])
             disp_one_by_line(contributor_scores[:10])
             check_one(100, global_scores, contributor_scores)
