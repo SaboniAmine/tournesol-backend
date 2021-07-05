@@ -1,6 +1,6 @@
 
 from os import EX_NOPERM
-from tournesol.models.video import ComparisonCriteriaScore
+from tournesol.models.video import ComparisonCriteriaScore, ContributorRating, ContributorRatingCriteriaScore, VideoCriteriaScore
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
@@ -42,7 +42,7 @@ Structure:
 - fetch_data() provides data from the database
 - ml_run() uses this data as input, trains via in_and_out()
      and returns video scores
-- save_data() takes these scores and save them (TO DO)
+- save_data() takes these scores and save them
 - these 3 are called by Django at the end of this file
 
 USAGE:
@@ -65,9 +65,9 @@ os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
 EPOCHS = 50
-CRITERIAS = [  "reliability", "importance", "engaging", "pedagogy", 
-                "layman_friendly", "diversity_inclusion", "backfire_risk", 
-                "better_habits", "entertaining_relaxing"]
+CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
+             "layman_friendly", "diversity_inclusion", "backfire_risk", 
+             "better_habits", "entertaining_relaxing"]
 
 def fetch_data():
     """ Fetches the data from the Comparisons model
@@ -253,11 +253,57 @@ def ml_run(comparison_data, epochs, verb=2):
         local_scores += out_loc
     return global_scores, local_scores
 
-def save_data(global_scores, local_scores):
+def save_data(video_scores, contributor_rating_scores):
     """
     Saves in the scores for Videos and ContributorRatings
     """
-    pass
+    VideoCriteriaScore.objects.all().delete()
+    VideoCriteriaScore.objects.bulk_create([
+        VideoCriteriaScore(
+            video_id=video_id,
+            criteria=criteria,
+            score=score,
+            uncertainty=uncertainty,
+        )
+        for video_id, criteria, score, uncertainty in video_scores
+    ])
+
+    rating_ids = {
+        (contributor_id, video_id): rating_id
+        for rating_id, contributor_id, video_id in ContributorRating.objects.all().values_list("id", "user_id", "video_id")
+    }
+    ratings_to_create = set(
+        (contributor_id, video_id)
+        for contributor_id, video_id, criteria_name, score, uncertainty in contributor_rating_scores
+        if (contributor_id, video_id) not in rating_ids
+    )
+    created_ratings = ContributorRating.objects.bulk_create([
+        ContributorRating(
+            video_id=video_id,
+            user_id=contributor_id,
+            is_public=False,
+        )
+        for contributor_id, video_id in ratings_to_create 
+    ])
+    rating_ids.update({
+        (rating.user_id, rating.video_id): rating.id
+        for rating in created_ratings
+    })
+    ContributorRatingCriteriaScore.objects.all().delete()
+    ContributorRatingCriteriaScore.objects.bulk_create([
+        ContributorRatingCriteriaScore(
+            contributor_rating_id=rating_ids[(contributor_id, video_id)],
+            criteria=criteria,
+            score=score,
+            uncertainty=uncertainty,
+        )
+        for contributor_id, video_id, criteria, score, uncertainty in contributor_rating_scores
+    ])
+
+    
+
+
+    
 
 
 # ============= for experiments only ========= production code below this
