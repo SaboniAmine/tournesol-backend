@@ -5,11 +5,11 @@ def predict(input, tens):
     tens: tensor = model
     input: tensor one-hot encoding video
 
-    Returns: -score of the video according to the model
+    Returns: - score of the video according to the model
     '''
     return torch.matmul(input.float(), tens)
 
-# losses (used in flower.py)
+# losses (used in licchavi.py)
 def fbbt(t,r):
     ''' fbbt loss function '''
     return torch.log(abs(torch.sinh(t)/t)) + r * t + torch.log(torch.tensor(2))
@@ -30,20 +30,17 @@ def fit_loss(s, ya, yb, r):
 
 def s_loss(s):
     ''' second term of local loss (for one node) '''
-    #return (2 * s - torch.log(s))
-    return (2 * s**2 - torch.log(s))
+    return (0.5 * s**2 - torch.log(s))
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
     ''' fitting loss for one node, includes s_loss '''
-    # ya_batch = torch.matmul(a_batch.float(), model)
-    # yb_batch = torch.matmul(b_batch.float(), model)
     ya_batch = predict(a_batch, model)
     yb_batch = predict(b_batch, model)
     loss = 0 
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
-    return loss / len(a_batch) + s_loss(s)
-    #return loss  + s_loss(s)
+    #return loss / len(a_batch) + s_loss(s)
+    return loss + s_loss(s) # paper version
 
 def models_dist(model1, model2, pow=(1,1), mask=None):  
     ''' distance between 2 models (l1 by default)

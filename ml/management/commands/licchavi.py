@@ -1,6 +1,4 @@
 import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
 from copy import deepcopy
 from time import time
 
@@ -16,7 +14,6 @@ Organisation:
 - ML model and decentralised structure are here
 - Data is handled in "ml_train.py"
 - some helpful small functions are in "utilities.py"
-
 
 Notations:
 - node = user : contributor
@@ -36,16 +33,12 @@ Structure:
 
 USAGE:
 - hardcode training hyperparameters in Licchavi __init__
-- use get_licchavi() to get an empty Licchavi
+- use get_licchavi() to get an empty Licchavi structure
 - use Licchavi.set_allnodes() to populate nodes
 - use Licchavi.train() to train the models
 - use Licchavi.output_scores() to get the results
 
 """
-
-FOLDER_PATH = "ml/checkpoints" 
-FILENAME = "models_weights"
-PATH = FOLDER_PATH + "/" + FILENAME
 
 def get_model(nb_vids, gpu=False, zero_init=True):
     model = torch.zeros(nb_vids, requires_grad=True)
@@ -146,13 +139,13 @@ class Licchavi():
         if verb:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
-    def load_and_update(self, data_dic, user_ids, verb=1):
+    def load_and_update(self, data_dic, user_ids, fullpath, verb=1):
         ''' loads weights and expands them as required 
 
         data_dic: dictionnary {userID: ()}
         user_ids: list/array of user IDs
         '''
-        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(PATH + self.criteria)
+        self.criteria, dic_old, gen_model_old, loc_models_old = torch.load(fullpath)
         nb_new = self.nb_params - len(dic_old) # number of new videos
         self.general_model = expand_tens(gen_model_old, nb_new) # initialize scores for new videos
         self.opt_gen = self.opt([self.general_model], lr=self.lr_gen)
@@ -195,7 +188,7 @@ class Licchavi():
             vids_batch = list(self.dic.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
-    def save_models(self):
+    def save_models(self, fullpath):
         ''' saves age and global and local weights, detached (no gradients) '''
         local_data = {id:  (node[5],            # s
                             node[6].detach(),   # model
@@ -206,7 +199,7 @@ class Licchavi():
                         self.general_model.detach(), 
                         local_data
                         )
-        torch.save(saved_data, PATH + self.criteria)
+        torch.save(saved_data, fullpath)
 
     # ---------- methods for training ------------
     def _set_lr(self):

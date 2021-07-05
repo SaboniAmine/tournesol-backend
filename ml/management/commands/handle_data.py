@@ -61,7 +61,7 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
     return nodes_dic, user_ids, vid_vidx
 
-def distribute_data_from_save(arr, crit, path, gpu=False):
+def distribute_data_from_save(arr, crit, fullpath, gpu=False):
     ''' Distributes data on nodes according to user IDs for one criteria
         Output is compatible with previously stored models
 
@@ -73,7 +73,8 @@ def distribute_data_from_save(arr, crit, path, gpu=False):
     - array of user IDs
     - dictionnary of {vID: video idx}
     '''
-    _, dic_old, _, _ = torch.load(path + crit) # loading previous data
+    # fullpath = path + '_' + crit
+    _, dic_old, _, _ = torch.load(fullpath) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
     user_ids, first_of_each = np.unique(arr[:,0], return_index=True)

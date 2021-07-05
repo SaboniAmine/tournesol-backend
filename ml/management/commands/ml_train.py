@@ -57,7 +57,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = True  # False to compute all data
+EXPERIMENT_MODE = False  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints" 
 FILENAME = "models_weights"
@@ -65,7 +65,7 @@ PATH = FOLDER_PATH + "/" + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
-EPOCHS = 50
+EPOCHS = 100
 CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
              "layman_friendly", "diversity_inclusion", "backfire_risk", 
              "better_habits", "entertaining_relaxing"]
@@ -81,7 +81,6 @@ def fetch_data():
         for ccs in ComparisonCriteriaScore.objects.all().prefetch_related("comparison") ]
     return comparison_data
 
-
 def in_and_out(comparison_data, crit, epochs, verb=2):
     ''' Trains models and returns video scores for one criteria
 
@@ -95,17 +94,20 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
     '''
     one_crit = select_criteria(comparison_data, crit)
     full_data = shape_data(one_crit)
+    fullpath = PATH + '_' + crit
     if RESUME:
-        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data, crit, PATH)
+        nodes_dic, users_ids, vid_vidx = distribute_data_from_save( full_data, 
+                                                                    crit, 
+                                                                    fullpath)
         flow = get_licchavi(len(vid_vidx), vid_vidx, crit) 
-        flow.load_and_update(nodes_dic, users_ids)
+        flow.load_and_update(nodes_dic, users_ids, fullpath)
     else:
         nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
         flow = get_licchavi(len(vid_vidx), vid_vidx, crit)
         flow.set_allnodes(nodes_dic, users_ids)
     h = flow.train(epochs, verb=verb) 
     glob, loc = flow.output_scores()
-    flow.save_models()
+    flow.save_models(fullpath)
     if EXPERIMENT_MODE:
         flow.check() # some tests
         print("nb_nodes", flow.nb_nodes)
@@ -182,27 +184,24 @@ def save_data(video_scores, contributor_rating_scores):
 # ============= for experiments only ========= production code below this
 
 if EXPERIMENT_MODE:
-    CRITERIAS = ["reliability", "importance"]
+    CRITERIAS = ["reliability"]
     TEST_DATA = [
                     [0, 100, 101, "reliability", 100, 0],
+                    [0, 101, 110, "reliability", 0, 0],
                     [1, 100, 101, "importance", 100, 0],
-                    # [1, 100, 101, "reliability", 100, 0],
-                    # [0, 101, 110, "reliability", 0, 0],
-                    # [1, 102, 103, "reliability", 70, 0],
-                    # [2, 104, 105, "reliability", 50, 0],
-                    # [3, 106, 107, "reliability", 30, 0],
-                    # [4, 108, 109, "reliability", 30, 0],
-                    # [5, 208, 209, "reliability", 0, 0],
-                    # [8, 200, 201, "reliability", 0, 0],
+                    [1, 100, 101, "reliability", 100, 0],
+                    [1, 102, 103, "reliability", 70, 0],
+                    [2, 104, 105, "reliability", 50, 0],
+                    [3, 106, 107, "reliability", 30, 0],
+                    [4, 108, 109, "reliability", 30, 0],
                     # [67, 200, 201, "reliability", 0, 0]
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 1
+    EPOCHS = 100
     TRAIN = True 
     RESUME = True
     
-
 class Command(BaseCommand):
     help = 'Runs the ml'
     def handle(self, *args, **options):
@@ -210,7 +209,7 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(2)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:1000], EPOCHS, verb=1)
+                global_scores, contributor_scores = ml_run(TEST_DATA + comparison_data[:000], EPOCHS, verb=1)
                 save_to_json(global_scores, contributor_scores, NAME)
             else:
                 global_scores, contributor_scores = load_from_json(NAME)
@@ -218,7 +217,7 @@ class Command(BaseCommand):
             disp_one_by_line(global_scores[:10])
             disp_one_by_line(contributor_scores[:10])
             check_one(100, global_scores, contributor_scores)
-            print("global:", len(global_scores),"local:",  len(contributor_scores))
+            print("global:", len(global_scores), "local:",  len(contributor_scores))
 
 # =================== PRODUCTION ========================
         # just train on all data and predict if not experiment mode
