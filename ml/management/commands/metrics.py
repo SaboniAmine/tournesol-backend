@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from ml.management.commands.losses import round_loss
+from .losses import round_loss
 
 # metrics on models
 def extract_grad(model):

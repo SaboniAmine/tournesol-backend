@@ -11,11 +11,12 @@ import numpy as np
 import torch
 import os
 
-from ml.management.commands.flower import get_flower
-from ml.management.commands.handle_data import rescale_rating, sort_by_first, one_hot_vids
-from ml.management.commands.handle_data import reverse_idxs, get_mask, get_all_vids
-from ml.management.commands.handle_data import save_to_json, load_from_json, expand_dic
-from ml.management.commands.visualisation import disp_one_by_line, seedall, check_one
+from .flower import get_flower
+from .handle_data import select_criteria, shape_data
+from .handle_data import distribute_data, distribute_data_from_save
+from .handle_data import format_out_loc, format_out_glob
+from .data_utility import save_to_json, load_from_json
+from .visualisation import disp_one_by_line, seedall, check_one
 """
 Machine Learning main python file
 
@@ -80,95 +81,6 @@ def fetch_data():
         for ccs in ComparisonCriteriaScore.objects.all().prefetch_related("comparison") ]
     return comparison_data
 
-def select_criteria(comparison_data, crit):
-    ''' Extracts not None comparisons of one criteria
-
-    comparison_data: output of fetch_data()
-    crit: str, name of criteria
-        
-    Returns: 
-    - list of all ratings for this criteria
-        (one element is [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str (crit), score: float, weight: float])
-    '''
-    l_ratings = [comp for comp in comparison_data if (comp[3] == crit and comp[4] is not None)]
-    return l_ratings
-
-def shape_data(l_ratings):
-    ''' Shapes data for distribute_data()/distribute_data_from_save()
-
-    l_ratings : list of not None ratings for one criteria, all users
-
-    Returns : one array with 4 columns : userID, vID1, vID2, rating ([-1,1]) 
-    '''
-    l_cleared = [rating[:3] + [rescale_rating(rating[4])] for rating in l_ratings]
-    arr = np.asarray(l_cleared)
-    return arr
-
-def distribute_data(arr, gpu=False): # change to add user ID to tuple
-    ''' Distributes data on nodes according to user IDs for one criteria
-        Output is not compatible with previously stored models, starts from scratch
-
-    arr: np 2D array of all ratings for all users for one criteria
-            (one line is [userID, vID1, vID2, score])
-
-    Returns:
-    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
-    - array of user IDs
-    - dictionnary of {vID: video idx}
-    '''
-    arr = sort_by_first(arr) # sorting by user IDs
-    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
-    first_of_each = list(first_of_each) # to be able to append
-    first_of_each.append(len(arr)) # to have last index too
-    vids = get_all_vids(arr)  # all unique video IDs
-    vid_vidx = reverse_idxs(vids) # dictionnary of  {vID: video idx}
-    nodes_dic = {}   # futur dictionnary of data for each user
-
-    for i, id in enumerate(user_ids):
-        node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
-        vid1 = node_arr[:,1] # iterable of video IDs
-        vid2 = node_arr[:,2]
-        batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(vid_vidx, vid1)
-        batch2 = one_hot_vids(vid_vidx, vid2)
-        mask = get_mask(batch1, batch2) # which videos are rated by user
-        batchout = torch.FloatTensor(node_arr[:,3])
-        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
-    return nodes_dic, user_ids, vid_vidx
-
-def distribute_data_from_save(arr, crit, gpu=False):
-    ''' Distributes data on nodes according to user IDs for one criteria
-        Output is compatible with previously stored models
-
-    arr: np 2D array of all ratings for all users for one criteria
-            (one line is [userID, vID1, vID2, score])
-
-    Returns:
-    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
-    - array of user IDs
-    - dictionnary of {vID: video idx}
-    '''
-    _, dic_old, _, _ = torch.load(PATH + crit) # loading previous data
-
-    arr = sort_by_first(arr) # sorting by user IDs
-    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
-    first_of_each = list(first_of_each) # to be able to append
-    first_of_each.append(len(arr)) # to have last index too
-    vids = get_all_vids(arr)  # all unique video IDs
-    vid_vidx = expand_dic(dic_old, vids) # update dictionnary
-    nodes_dic = {}    # futur list of data for each user
-
-    for i, id in enumerate(user_ids):
-        node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
-        vid1 = node_arr[:,1] # iterable of video IDs
-        vid2 = node_arr[:,2]
-        batchvids = get_all_vids(node_arr) # unique video IDs of node
-        batch1 = one_hot_vids(vid_vidx, vid1)
-        batch2 = one_hot_vids(vid_vidx, vid2)
-        mask = get_mask(batch1, batch2) # which videos are rated by user
-        batchout = torch.FloatTensor(node_arr[:,3])
-        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
-    return nodes_dic, user_ids, vid_vidx
 
 def in_and_out(comparison_data, crit, epochs, verb=2):
     ''' Trains models and returns video scores for one criteria
@@ -184,7 +96,7 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
     one_crit = select_criteria(comparison_data, crit)
     full_data = shape_data(one_crit)
     if RESUME:
-        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data, crit)
+        nodes_dic, users_ids, vid_vidx = distribute_data_from_save(full_data, crit, PATH)
         flow = get_flower(len(vid_vidx), vid_vidx, crit) 
         flow.load_and_update(nodes_dic, users_ids)
     else:
@@ -198,40 +110,6 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
         flow.check() # some tests
         print("nb_nodes", flow.nb_nodes)
     return glob, loc, users_ids
-
-def format_out_glob(glob, crit):
-    ''' Puts data in list of global scores (one criteria)
-    
-    glob: (tensor of all vIDS , tensor of global video scores)
-    crit: criteria
-    
-    Returns: 
-    - list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
-    '''
-    l_out = []
-    ids, scores = glob
-    for i in range(len(ids)):
-        out = [int(ids[i]), crit, round(scores[i].item(), 2), 0] # uncertainty is 0 for now
-        l_out.append(out)
-    return l_out
-
-def format_out_loc(loc, users_ids, crit):
-    ''' Puts data in list of local scores (one criteria)
-
-    loc: (list of tensor of local vIDs , list of tensors of local video scores)
-    users_ids: list/array of user IDs in same order
-    
-    Returns : 
-    - list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
-    '''
-    l_out = []
-    vids, scores = loc
-    for user_id, user_vids, user_scores in zip(users_ids, vids, scores):
-        for i in range(len(user_vids)):
-            out = [int(user_id), int(user_vids[i].item()), 
-                    crit, round(user_scores[i].item(), 2), 0] # uncertainty is 0 for now
-            l_out.append(out)
-    return l_out
 
 def ml_run(comparison_data, epochs, verb=2):
     """ Runs the ml algorithm for all CRITERIAS (global variable)

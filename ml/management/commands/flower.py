@@ -4,10 +4,11 @@ import torch
 from copy import deepcopy
 from time import time
 
-from ml.management.commands.metrics import extract_grad, sp
-from ml.management.commands.losses import model_norm, round_loss, models_dist
-from ml.management.commands.handle_data import expand_tens, one_hot_vids
-from ml.management.commands.losses import node_local_loss, predict
+
+from .losses import model_norm, round_loss, models_dist
+from .losses import node_local_loss, predict
+from .metrics import extract_grad, sp
+from .data_utility import expand_tens, one_hot_vids
 
 """
 Machine Learning algorithm, used in "ml_train"

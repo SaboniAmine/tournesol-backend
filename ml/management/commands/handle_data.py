@@ -1,114 +1,133 @@
-import torch
 import numpy as np
-import json
-import pickle 
+import torch
+
+from .data_utility import rescale_rating, sort_by_first, one_hot_vids
+from .data_utility import reverse_idxs, get_mask, get_all_vids
+from .data_utility import save_to_json, load_from_json, expand_dic
 
 
-# to handle data (used in ml_train.py)
-def rescale_rating(rating):
-    ''' rescales from 0-100 to [-1,1] float '''
-    return rating / 50 - 1
+def select_criteria(comparison_data, crit):
+    ''' Extracts not None comparisons of one criteria
 
-def get_all_vids(arr):
-    ''' get all unique vIDs for one criteria (all users) '''
-    return np.unique(arr[:,1:3])
-
-def get_mask(batch1, batch2):
-    ''' get mask '''
-    batch = batch1 + batch2
-    to = batch.sum(axis=0, dtype=bool)
-    return [to]
-
-def sort_by_first(arr):
-    ''' sorts 2D array lines by first element of lines '''
-    order = np.argsort(arr,axis=0)[:,0]
-    return arr[order,:]
-
-def one_hot_vid(dic, vid):
-    ''' One-hot inputs for neural network
-    
-    dic: dictionnary of {vID: idx}
-    vid: vID
-
-    Returns: 1D boolesn tensor with 0s and 1 only for video index
+    comparison_data: output of fetch_data()
+    crit: str, name of criteria
+        
+    Returns: 
+    - list of all ratings for this criteria
+        (one element is [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str (crit), score: float, weight: float])
     '''
-    tens = torch.zeros(len(dic), dtype=bool)
-    tens[dic[vid]] = True
-    return tens
+    l_ratings = [comp for comp in comparison_data if (comp[3] == crit and comp[4] is not None)]
+    return l_ratings
 
-def one_hot_vids(dic, l_vid):
-    ''' One-hot inputs for neural network, list to batch
-    
-    dic: dictionnary of {vID: idx}
-    vid: list of vID
+def shape_data(l_ratings):
+    ''' Shapes data for distribute_data()/distribute_data_from_save()
 
-    Returns: 2D bollean tensor with one line being 0s and 1 only for video index
+    l_ratings : list of not None ratings for one criteria, all users
+
+    Returns : one array with 4 columns : userID, vID1, vID2, rating ([-1,1]) 
     '''
-    batch = torch.zeros(len(l_vid), len(dic), dtype=bool)
-    for idx, vid in enumerate(l_vid):
-        batch[idx][dic[vid]] = True
-    return batch
+    l_cleared = [rating[:3] + [rescale_rating(rating[4])] for rating in l_ratings]
+    arr = np.asarray(l_cleared)
+    return arr
 
-def reverse_idxs(vids):
-    ''' Returns dictionnary of {vid: idx} '''
-    vid_vidx = {}
-    for idx, vid in enumerate(vids):
-        vid_vidx[vid] = idx
-    return vid_vidx 
+def distribute_data(arr, gpu=False): # change to add user ID to tuple
+    ''' Distributes data on nodes according to user IDs for one criteria
+        Output is not compatible with previously stored models, starts from scratch
 
-# used for updating models after loading
-def expand_tens(tens, nb_new):
-    ''' Expands a tensor to include scores for new videos
-    
-    tens: a detached tensor 
+    arr: np 2D array of all ratings for all users for one criteria
+            (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - expanded tensor requiring gradients
+    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - array of user IDs
+    - dictionnary of {vID: video idx}
     '''
-    full = torch.cat([tens, torch.zeros(nb_new)])
-    full.requires_grad=True
-    return full
+    arr = sort_by_first(arr) # sorting by user IDs
+    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
+    first_of_each = list(first_of_each) # to be able to append
+    first_of_each.append(len(arr)) # to have last index too
+    vids = get_all_vids(arr)  # all unique video IDs
+    vid_vidx = reverse_idxs(vids) # dictionnary of  {vID: video idx}
+    nodes_dic = {}   # futur dictionnary of data for each user
 
-def expand_dic(dic, l_vid_new):
-    ''' Expands a dictionnary to include new videos IDs
+    for i, id in enumerate(user_ids):
+        node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
+        vid1 = node_arr[:,1] # iterable of video IDs
+        vid2 = node_arr[:,2]
+        batchvids = get_all_vids(node_arr) # unique video IDs of node
+        batch1 = one_hot_vids(vid_vidx, vid1)
+        batch2 = one_hot_vids(vid_vidx, vid2)
+        mask = get_mask(batch1, batch2) # which videos are rated by user
+        batchout = torch.FloatTensor(node_arr[:,3])
+        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
+    return nodes_dic, user_ids, vid_vidx
 
-    dic: dictionnary of {video ID: video idx}
-    l_vid_new: int list of video ID
-    
+def distribute_data_from_save(arr, crit, path, gpu=False):
+    ''' Distributes data on nodes according to user IDs for one criteria
+        Output is compatible with previously stored models
+
+    arr: np 2D array of all ratings for all users for one criteria
+            (one line is [userID, vID1, vID2, score])
+
     Returns:
-    - dictionnary of {video ID: video idx} updated (bigger)
+    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - array of user IDs
+    - dictionnary of {vID: video idx}
     '''
-    idx = len(dic)
-    for vid_new in l_vid_new:
-        if vid_new not in dic:
-            dic[vid_new] = idx
-            idx += 1
-    return dic
+    _, dic_old, _, _ = torch.load(path + crit) # loading previous data
 
-# save and load data
-def save_to_json(global_scores, local_scores, suff=""):
-    ''' saves scores in json files '''
-    with open("global_scores{}.json".format(suff), 'w') as f:
-        json.dump(global_scores, f, indent=1) 
-    with open("local_scores{}.json".format(suff), 'w') as f:
-        json.dump(local_scores, f, indent=1) 
+    arr = sort_by_first(arr) # sorting by user IDs
+    user_ids, first_of_each = np.unique(arr[:,0], return_index=True)
+    first_of_each = list(first_of_each) # to be able to append
+    first_of_each.append(len(arr)) # to have last index too
+    vids = get_all_vids(arr)  # all unique video IDs
+    vid_vidx = expand_dic(dic_old, vids) # update dictionnary
+    nodes_dic = {}    # futur list of data for each user
 
-def load_from_json(suff=""):
-    ''' loads previously saved data '''
-    with open("global_scores{}.json".format(suff), 'r') as f:
-        global_scores = json.load(f)
-    with open("local_scores{}.json".format(suff), 'r') as f:
-        local_scores = json.load(f)
-    return global_scores, local_scores
+    for i, id in enumerate(user_ids):
+        node_arr = arr[first_of_each[i]: first_of_each[i+1], :]
+        vid1 = node_arr[:,1] # iterable of video IDs
+        vid2 = node_arr[:,2]
+        batchvids = get_all_vids(node_arr) # unique video IDs of node
+        batch1 = one_hot_vids(vid_vidx, vid1)
+        batch2 = one_hot_vids(vid_vidx, vid2)
+        mask = get_mask(batch1, batch2) # which videos are rated by user
+        batchout = torch.FloatTensor(node_arr[:,3])
+        nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
+    return nodes_dic, user_ids, vid_vidx
 
-def save_to_pickle(obj, name="pickle"):
-    ''' save python object to pickle file '''
-    filename = '{}.p'.format(name)
-    with open(filename, 'wb') as filehandler:
-        pickle.dump(obj, filehandler)
 
-def load_from_pickle(name="pickle"):
-    filename = '{}.p'.format(name)
-    with open(filename, 'rb') as filehandler:
-        obj = pickle.load(filehandler)
-    return obj
+
+def format_out_glob(glob, crit):
+    ''' Puts data in list of global scores (one criteria)
+    
+    glob: (tensor of all vIDS , tensor of global video scores)
+    crit: criteria
+    
+    Returns: 
+    - list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
+    '''
+    l_out = []
+    ids, scores = glob
+    for i in range(len(ids)):
+        out = [int(ids[i]), crit, round(scores[i].item(), 2), 0] # uncertainty is 0 for now
+        l_out.append(out)
+    return l_out
+
+def format_out_loc(loc, users_ids, crit):
+    ''' Puts data in list of local scores (one criteria)
+
+    loc: (list of tensor of local vIDs , list of tensors of local video scores)
+    users_ids: list/array of user IDs in same order
+    
+    Returns : 
+    - list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
+    '''
+    l_out = []
+    vids, scores = loc
+    for user_id, user_vids, user_scores in zip(users_ids, vids, scores):
+        for i in range(len(user_vids)):
+            out = [int(user_id), int(user_vids[i].item()), 
+                    crit, round(user_scores[i].item(), 2), 0] # uncertainty is 0 for now
+            l_out.append(out)
+    return l_out
