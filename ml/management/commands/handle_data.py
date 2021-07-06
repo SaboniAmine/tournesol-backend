@@ -48,7 +48,7 @@ def distribute_data(arr, gpu=False): # change to add user ID to tuple
 
     Returns:
     - dictionnary {userID: (vID1_batch, vID2_batch, 
-                            rating_batch, single_vIDs, masks)}
+                            rating_batch, single_vIDs, mask)}
     - array of user IDs
     - dictionnary of {vID: video idx}
     '''

@@ -81,11 +81,11 @@ class Licchavi():
         self.pow_reg = (2,1)  # (internal power, external power)
 
         self.nb_nodes = 0
-        self.nodes = [] # list of lists
+        self.nodes = {}
 
         # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
-        # ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
+  
     
     def set_params(self, **params):
         """ set training hyperparameters """
@@ -100,8 +100,8 @@ class Licchavi():
     # ------------ input and output --------------------
     def _get_default(self):
         ''' Returns: - (default s, default model, default age) '''
-        model_plus = (  torch.ones(1, requires_grad=True), 
-                        self.get_model(self.nb_params, self.gpu),
+        model_plus = (  torch.ones(1, requires_grad=True), # s
+                        self.get_model(self.nb_params, self.gpu), # model
                         0 #age
                         )
         return model_plus
@@ -161,9 +161,10 @@ class Licchavi():
         nbn = len(user_ids)
         self.nb_nodes = nbn
         
-        self.nodes = { id: [    *data, # 0 to 4: userID, vID1, vID2, r, masks
-                                *self._get_saved(loc_models_old, id, nb_new), # 5 to 7
-                                None, # 8: optimizer
+        self.nodes = { id: [    *data, # 0 to 4: vID1, vID2, r, vIDs, mask
+                                # 5 to 7: s, model, age
+                                *self._get_saved(loc_models_old, id, nb_new), 
+                                None, # 8: optimizer, defined below
                                 self.w # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}                   
         for node in self.nodes.values(): # set optimizers
@@ -220,7 +221,7 @@ class Licchavi():
             yield node[idx]
     
     def stat_s(self):
-        ''' returns array of s values '''
+        ''' print s stats '''
         l_s = [(round_loss(s, 2), id) for s, id in zip(self._all_nodes("s"), 
                                                         self.nodes.keys() )]
         tens = torch.tensor(l_s)
@@ -242,7 +243,7 @@ class Licchavi():
         ''' resets gradients of all models '''
         for node in self.nodes.values():
             node[8].zero_grad()  # node optimizer 
-        self.opt_gen.zero_grad()
+        self.opt_gen.zero_grad() # general optimizer
 
     def _update_hist(self, epoch, fit, gen, reg, verb=1):
         ''' updates history '''
@@ -312,7 +313,7 @@ class Licchavi():
         # initialisation to avoid undefined variables at epoch 1
         loss, fit_loss, gen_loss, reg_loss = 0, 0, 0, 0
         c_fit, c_gen = 0, 0
-
+        
         const = 10  # just for visualisation (remove later)
         fit_scale = const 
         gen_scale = const  # node weights are used in addition
@@ -339,15 +340,15 @@ class Licchavi():
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for node in self.nodes.values():  
-                        fit_loss += node_local_loss(node[6],  # model
+                        fit_loss += node_local_loss(node[6],  # local model
                                                     node[5],  # s
                                                     node[0],  # id_batch1
                                                     node[1],  # id_batch2
                                                     node[2])  # r_batch
-                        g = models_dist(node[6], # model
-                                        self.general_model, 
-                                        self.pow_gen, 
-                                        node[4] # mask
+                        g = models_dist(node[6],            # local model
+                                        self.general_model, # general model
+                                        self.pow_gen,       # norm
+                                        node[4]             # mask
                                         ) 
                         gen_loss +=  node[9] * g  # node weight  * generalisation term
                     fit_loss *= fit_scale
@@ -358,17 +359,16 @@ class Licchavi():
                 else:        
                     gen_loss, reg_loss = 0, 0
                     for node in self.nodes.values():   
-                        g = models_dist(node[6], # model
-                                        self.general_model, 
-                                        self.pow_gen,
-                                        node[4] # mask
+                        g = models_dist(node[6],            # local model
+                                        self.general_model, # general model
+                                        self.pow_gen,       # norm
+                                        node[4]             # mask
                                         )
-                        gen_loss += node[9] * g  # node weight  * generalisation term
+                        gen_loss += node[9] * g  # node weight * generalis term
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
                     reg_loss *= reg_scale        
                     loss = gen_loss + reg_loss
-                    # print(self.general_model)
 
                 if verb >= 2:
                     total_out = round_loss(fit_loss + gen_loss + reg_loss)
@@ -414,4 +414,3 @@ def get_licchavi(nb_vids, dic, crit, gpu=False):
     params = get_defaults() # defaults hyperparameters from "hyperparameters.py"
     licch.set_params(**params)
     return licch
-
