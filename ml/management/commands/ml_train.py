@@ -18,6 +18,8 @@ from .handle_data import distribute_data, distribute_data_from_save
 from .handle_data import format_out_loc, format_out_glob
 from .data_utility import save_to_json, load_from_json
 from .visualisation import disp_one_by_line, seedall, check_one
+from .experiments import licch_stats
+
 """
 Machine Learning main python file
 
@@ -114,9 +116,7 @@ def shape_train_predict(comparison_data, crit, epochs, verb=2):
     glob, loc = licch.output_scores()
     licch.save_models(fullpath)
     if EXPERIMENT_MODE:
-        licch.check() # some tests
-        print("nb_nodes", licch.nb_nodes)
-        licch.stat_s()
+        licch_stats(licch)
     return glob, loc, users_ids
 
 def ml_run(comparison_data, epochs, verb=2):
