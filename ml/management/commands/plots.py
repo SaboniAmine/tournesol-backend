@@ -3,10 +3,11 @@ import numpy as np
 from copy import deepcopy
 
 INTENS = 0.4
+# tuple of label, ordinate legend, filename
 METRICS = ({"lab":"fit", "ord": "Training Loss", "f_name": "loss"}, 
            {"lab":"gen", "ord": "Training Loss", "f_name": "loss"}, 
            {"lab":"reg", "ord": "Training Loss", "f_name": "loss"}, 
-           {"lab":"acc", "ord": "Accuracy", "f_name": "acc"}, 
+           #{"lab":"acc", "ord": "Accuracy", "f_name": "acc"}, 
            {"lab":"l2_dist", "ord": "l2 norm", "f_name": "l2dist"}, 
            {"lab":"l2_norm", "ord": "l2 norm", "f_name": "l2dist"}, 
            {"lab":"grad_sp", "ord": "Scalar Product", "f_name": "grad"}, 
@@ -115,7 +116,7 @@ def plot_var(l_hist, l_idx):
                                     color=color)
         plt.fill_between(epochs, vals_u, vals_l, alpha=INTENS, color=color)
 
-def plotfull_var(l_hist, l_idx, title=None, path=None, show=True):
+def plotfull_var(l_hist, l_idx, title=None, path=None, show=False):
     ''' plot metrics asked in -l_idx and save if -path provided '''
     plot_var(l_hist, l_idx)
     idx = l_idx[0]
@@ -123,34 +124,35 @@ def plotfull_var(l_hist, l_idx, title=None, path=None, show=True):
     title_save(title, path, suff=" {}.png".format(METRICS[idx]["f_name"]))
     if show: 
         plt.show()
+    plt.clf()
 
 # ------- groups of metrics on a same plot -----------
 def loss_var(l_hist, title=None, path=None):
     ''' plot losses with variance from a list of historys '''
     plotfull_var(l_hist, [0,1,2], title, path)
 
-def acc_var(l_hist, title=None, path=None):
-    ''' plot accuracy with variance from a list of historys '''
-    plt.ylim([0,1])
-    plt.grid(True, which='major', linewidth=1, axis='y', alpha=1)
-    plt.minorticks_on()
-    plt.grid(True, which='minor', linewidth=0.8, axis='y', alpha=0.8)
-    plotfull_var(l_hist, [3], title, path)
+# def acc_var(l_hist, title=None, path=None):
+#     ''' plot accuracy with variance from a list of historys '''
+#     plt.ylim([0,1])
+#     plt.grid(True, which='major', linewidth=1, axis='y', alpha=1)
+#     plt.minorticks_on()
+#     plt.grid(True, which='minor', linewidth=0.8, axis='y', alpha=0.8)
+#     plotfull_var(l_hist, [3], title, path)
 
 def l2_var(l_hist, title=None, path=None):
     '''plot l2 norm of gen model from a list of historys'''
-    plotfull_var(l_hist, [4,5], title, path)
+    plotfull_var(l_hist, [3,4], title, path)
 
 def gradsp_var(l_hist, title=None, path=None):
     ''' plot scalar product of gradients between 2 consecutive epochs
         from a list of historys
     '''
-    plotfull_var(l_hist, [6,7], title, path)
+    plotfull_var(l_hist, [5,6], title, path)
 
 # plotting all we have
 def plot_metrics(l_hist, title=None, path=None):
     '''plot and save the different metrics from list of historys'''
-    acc_var(l_hist, title, path)  
+    # acc_var(l_hist, title, path)  
     loss_var(l_hist, title, path)
     l2_var(l_hist, title, path)
     gradsp_var(l_hist, title, path)

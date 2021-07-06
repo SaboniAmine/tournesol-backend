@@ -41,7 +41,7 @@ USAGE:
 
 """
 
-def get_model(nb_vids, gpu=False, zero_init=True):
+def get_model(nb_vids, gpu=False):
     model = torch.zeros(nb_vids, requires_grad=True)
     if gpu:
         return model.cuda()
@@ -182,7 +182,8 @@ class Licchavi():
         with torch.no_grad():
             glob_scores = self.general_model
             var = torch.var(glob_scores)
-            mini, maxi = torch.min(glob_scores).item(),  torch.max(glob_scores).item()
+            mini, maxi = (torch.min(glob_scores).item(),  
+                            torch.max(glob_scores).item() )
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
             for node in self.nodes.values():

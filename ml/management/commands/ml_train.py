@@ -8,8 +8,6 @@ from numpy.core.numeric import full
 from tournesol.models import Comparison
 from settings.settings import VIDEO_FIELDS
 
-import numpy as np
-import torch
 import os
 
 from .licchavi import get_licchavi
@@ -215,9 +213,9 @@ if EXPERIMENT_MODE:
                 ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
     NAME = ""
-    EPOCHS = 30
+    EPOCHS = 100
     TRAIN = True 
-    RESUME = True
+    RESUME = False
     
 class Command(BaseCommand):
     help = 'Runs the ml'
@@ -226,9 +224,9 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(3)
                 comparison_data = fetch_data()
-                glob_scores, contributor_scores = ml_run(comparison_data[:10000], 
+                glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
                                                             EPOCHS, 
-                                                            verb=1)
+                                                            verb=2)
                 save_to_json(glob_scores, contributor_scores, NAME)
             else:
                 glob_scores, contributor_scores = load_from_json(NAME)
