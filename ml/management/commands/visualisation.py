@@ -1,6 +1,12 @@
 import numpy as np
 import torch
 
+"""
+Visualisation methods, mainly for test and debugging
+
+Main file is "ml_train.py"
+"""
+
 
 # debug helpers
 def check_one(vid, comp_glob, comp_loc):

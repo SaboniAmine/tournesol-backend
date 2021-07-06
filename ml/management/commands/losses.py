@@ -1,5 +1,11 @@
 import torch
 
+"""
+Losses used in "licchavi.py"
+
+Main file is "ml_train.py"
+"""
+
 def predict(input, tens):
     ''' 
     tens: tensor = model

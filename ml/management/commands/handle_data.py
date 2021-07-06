@@ -4,6 +4,12 @@ import torch
 from .data_utility import rescale_rating, sort_by_first, one_hot_vids
 from .data_utility import reverse_idxs, get_mask, get_all_vids, expand_dic
 
+"""
+To prepare data from training and reshape it after training
+
+Main file is "ml_train.py"
+"""
+
 
 def select_criteria(comparison_data, crit):
     ''' Extracts not None comparisons of one criteria

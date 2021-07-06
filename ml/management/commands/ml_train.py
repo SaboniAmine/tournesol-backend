@@ -22,9 +22,9 @@ from .visualisation import disp_one_by_line, seedall, check_one
 Machine Learning main python file
 
 Organisation:
-- Data is handled here
+- main file is here
+- Data is handled in "handle_data.py"
 - ML model and decentralised structure are in "licchavi.py"
-- some helpful small functions are in "utilities.py"
 
 Notations:
 - node = user : contributor

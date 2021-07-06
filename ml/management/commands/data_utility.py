@@ -3,8 +3,14 @@ import numpy as np
 import json
 import pickle 
 
+"""
+Utility functions used in "handle_data.py"
 
-# to handle data (used in ml_train.py)
+Main file is "ml_train.py"
+"""
+
+
+# to handle data 
 def rescale_rating(rating):
     ''' rescales from 0-100 to [-1,1] float '''
     return rating / 50 - 1
@@ -14,7 +20,7 @@ def get_all_vids(arr):
     return np.unique(arr[:,1:3])
 
 def get_mask(batch1, batch2):
-    ''' get mask '''
+    ''' returns boolean tensor indicating which videos the user rated '''
     batch = batch1 + batch2
     to = batch.sum(axis=0, dtype=bool)
     return [to]
@@ -24,29 +30,29 @@ def sort_by_first(arr):
     order = np.argsort(arr,axis=0)[:,0]
     return arr[order,:]
 
-def one_hot_vid(dic, vid):
+def one_hot_vid(vid_vidx, vid):
     ''' One-hot inputs for neural network
     
-    dic: dictionnary of {vID: idx}
+    vid_vidx: dictionnary of {vID: idx}
     vid: vID
 
-    Returns: 1D boolesn tensor with 0s and 1 only for video index
+    Returns: 1D boolean tensor with 0s and 1 only for video index
     '''
-    tens = torch.zeros(len(dic), dtype=bool)
-    tens[dic[vid]] = True
+    tens = torch.zeros(len(vid_vidx), dtype=bool)
+    tens[vid_vidx[vid]] = True
     return tens
 
-def one_hot_vids(dic, l_vid):
+def one_hot_vids(vid_vidx, l_vid):
     ''' One-hot inputs for neural network, list to batch
     
-    dic: dictionnary of {vID: idx}
+    vid_vidx: dictionnary of {vID: idx}
     vid: list of vID
 
     Returns: 2D bollean tensor with one line being 0s and 1 only for video index
     '''
-    batch = torch.zeros(len(l_vid), len(dic), dtype=bool)
+    batch = torch.zeros(len(l_vid), len(vid_vidx), dtype=bool)
     for idx, vid in enumerate(l_vid):
-        batch[idx][dic[vid]] = True
+        batch[idx][vid_vidx[vid]] = True
     return batch
 
 def reverse_idxs(vids):
@@ -69,21 +75,21 @@ def expand_tens(tens, nb_new):
     full.requires_grad=True
     return full
 
-def expand_dic(dic, l_vid_new):
+def expand_dic(vid_vidx, l_vid_new):
     ''' Expands a dictionnary to include new videos IDs
 
-    dic: dictionnary of {video ID: video idx}
+    vid_vidx: dictionnary of {video ID: video idx}
     l_vid_new: int list of video ID
     
     Returns:
     - dictionnary of {video ID: video idx} updated (bigger)
     '''
-    idx = len(dic)
+    idx = len(vid_vidx)
     for vid_new in l_vid_new:
-        if vid_new not in dic:
-            dic[vid_new] = idx
+        if vid_new not in vid_vidx:
+            vid_vidx[vid_new] = idx
             idx += 1
-    return dic
+    return vid_vidx
 
 # save and load data
 def save_to_json(global_scores, local_scores, suff=""):

@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np 
 from copy import deepcopy
 
 INTENS = 0.4
@@ -63,8 +63,13 @@ def legendize(y):
 #     return title[:-2]
 
 def means_bounds(arr):
-    ''' from array return 1 array of means, 
-        1 of (mean - var), 1 of (mean + var)
+    '''  
+    arr: 2D array of values (one line is one run)
+
+    Returns:
+    - array of means
+    - array of (mean - var)
+    - array of (mean + var)
     '''
     means = np.mean(arr, axis=0)
     var = np.var(arr, axis = 0) 

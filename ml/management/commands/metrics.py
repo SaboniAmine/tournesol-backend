@@ -3,6 +3,12 @@ import numpy as np
 
 from .losses import round_loss
 
+"""
+Metrics used for training monitoring in "licchavi.py"
+
+Main file "ml_train.py"
+"""
+
 # metrics on models
 def extract_grad(model):
     ''' returns list of gradients of a model '''
