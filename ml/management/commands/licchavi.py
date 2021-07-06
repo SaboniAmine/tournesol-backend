@@ -7,6 +7,7 @@ from .losses import node_local_loss, predict
 from .metrics import extract_grad, sp
 from .data_utility import expand_tens, one_hot_vids
 from .visualisation import disp_one_by_line
+from .hyperparameters import get_defaults
 
 """
 Machine Learning algorithm, used in "ml_train.py"
@@ -49,34 +50,27 @@ def get_model(nb_vids, gpu=False):
 
 # nodes organisation
 class Licchavi():
-    ''' Training structure including local models and general one 
-        Allowing to add and remove nodes at will
-        .pop
-        .add_nodes
-        .rem_nodes
-        .train
-        .display
-        .check
-    '''
-    def __init__(self, nb_vids, dic, crit, gpu=False):
+    ''' Training structure including local models and general one '''
+    def __init__(self, nb_vids, vid_vidx, crit, gpu=False):
         ''' 
         nb_vids: number of different videos rated by at least one contributor 
                     for this criteria
-        dic: dictionnary of {vID: idx}
+        vid_vidx: dictionnary of {vID: idx}
+        crit: comparison criteria learnt
         '''
         self.nb_params = nb_vids  # number of parameters of the model(= nb of videos)
-        self.dic = dic # {video ID : video index (for that criteria)}
+        self.vid_vidx = vid_vidx # {video ID : video index (for that criteria)}
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
         self.criteria = crit # criteria learnt by this Licchavi
 
-        self.opt = torch.optim.SGD
-        speed = 1 # for tests, to remove
-        self.lr_node = speed*0.5     # local learning rate (local scores)
-        self.lr_s = speed*0.0001     # local learning rate for s parameter
-        self.lr_gen = speed*0.1  # global learning rate (global scores)
-        self.gen_freq = 1  # generalisation frequency (>=1)
-        self.w0 = 0.01      # regularisation strength
-        self.w = 0.1    # default weight for a node
+        self.opt = torch.optim.SGD   # optimizer
+        # defined in "hyperparameters.py"
+        self.lr_node = 0    # local learning rate (local scores)
+        self.lr_s = 0     # local learning rate for s parameter
+        self.lr_gen = 0  # global learning rate (global scores)
+        self.gen_freq = 0  # generalisation frequency (>=1)
+        self.w0 = 0     # regularisation strength
+        self.w = 0    # default weight for a node
 
         self.get_model = get_model # neural network to use
         self.general_model = self.get_model(nb_vids, gpu)
@@ -95,7 +89,7 @@ class Licchavi():
     
     def set_params(self, **params):
         """ set training hyperparameters """
-        self.opt = params["opt"]
+        #self.opt = params["opt"]
         self.lr_node = params["lr_node"]    # local learning rate (local scores)
         self.lr_s = params["lr_s"]    # local learning rate for s parameter
         self.lr_gen = params["lr_gen"]  # global learning rate (global scores)
@@ -197,11 +191,11 @@ class Licchavi():
             print("minimax:", mini,maxi)
             print("variance of global scores :", var.item())
             for node in self.nodes.values():
-                input = one_hot_vids(self.dic, node[3])
+                input = one_hot_vids(self.vid_vidx, node[3])
                 output = predict(input, node[6]) 
                 local_scores.append(output)
                 list_ids_batchs.append(node[3])
-            vids_batch = list(self.dic.keys())
+            vids_batch = list(self.vid_vidx.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     def save_models(self, fullpath):
@@ -211,7 +205,7 @@ class Licchavi():
                             node[7]            # age
                         ) for id, node in self.nodes.items()}
         saved_data = (  self.criteria,
-                        self.dic,
+                        self.vid_vidx,
                         self.general_model.detach(), 
                         local_data
                         )
@@ -261,7 +255,7 @@ class Licchavi():
         self.history[3].append(round_loss(dist, 1))
         self.history[4].append(round_loss(norm, 1))
         grad_gen = extract_grad(self.general_model)
-        if epoch > 1: # no last model for first epoch
+        if epoch > 1: # no previous model for first epoch
             scal_grad = sp(self.last_grad, grad_gen)
             self.history[5].append(scal_grad)
         else:
@@ -416,5 +410,8 @@ def get_licchavi(nb_vids, dic, crit, gpu=False):
     Returns:
     - Licchavi object with initialized global model and no local ones
     '''
-    return Licchavi(nb_vids, dic, crit, gpu=gpu)
+    licch = Licchavi(nb_vids, dic, crit, gpu=gpu)
+    params = get_defaults() # defaults hyperparameters from "hyperparameters.py"
+    licch.set_params(**params)
+    return licch
 

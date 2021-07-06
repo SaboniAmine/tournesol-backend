@@ -56,7 +56,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = False  # False to compute all data
+EXPERIMENT_MODE = True  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints/" 
 FILENAME = "models_weights"

@@ -4,6 +4,8 @@ from torch import optim
 from .plots import plot_metrics 
 from .data_utility import save_to_json, load_from_json
 from .visualisation import seedall, check_one, disp_one_by_line
+from .licchavi import get_licchavi
+
 
 PATH_PLOTS = "ml/plots/"
 makedirs(PATH_PLOTS, exist_ok=True)
@@ -22,14 +24,14 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 NAME = ""
-EPOCHS = 1
+EPOCHS = 200
 TRAIN = True 
-RESUME = True
+RESUME = False
 
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
-        seedall(3)
+        seedall(4)
         from .ml_train import ml_run
         glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
                                                     EPOCHS,
@@ -46,7 +48,6 @@ def run_experiment(comparison_data):
     disp_one_by_line(contributor_scores[:10])
     check_one(100, glob_scores, contributor_scores)
     print("glob:", len(glob_scores), "local:",  len(contributor_scores))
-
 
 def licch_stats(licch):
     ''' gives some statistics about licchavi object '''
@@ -70,4 +71,6 @@ def get_defaults():
                 #"nb_epochs": 100 # int >= 1, number of training epochs
                 }
     return defaults
+
+
 
