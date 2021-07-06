@@ -54,15 +54,13 @@ USAGE:
 - call ml_run(fetch_data()) if you just want the scores in python
 
 """
-def foo():
-    pass
 # global variables
 
-EXPERIMENT_MODE = True  # False to compute all data
+EXPERIMENT_MODE = False  # False to compute all data
 
-FOLDER_PATH = "ml/checkpoints" 
+FOLDER_PATH = "ml/checkpoints/" 
 FILENAME = "models_weights"
-PATH = FOLDER_PATH + "/" + FILENAME
+PATH = FOLDER_PATH + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
@@ -86,7 +84,7 @@ def fetch_data():
         in ComparisonCriteriaScore.objects.all().prefetch_related("comparison")]
     return comparison_data
 
-def shape_train_predict(comparison_data, crit, epochs, verb=2):
+def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
     ''' Trains models and returns video scores for one criteria
 
     comparison_data: output of fetch_data()
@@ -100,7 +98,7 @@ def shape_train_predict(comparison_data, crit, epochs, verb=2):
     one_crit = select_criteria(comparison_data, crit)
     full_data = shape_data(one_crit)
     fullpath = PATH + '_' + crit
-    if RESUME:
+    if resume:
         nodes_dic, users_ids, vid_vidx = distribute_data_from_save( full_data, 
                                                                     crit, 
                                                                     fullpath)
@@ -117,7 +115,7 @@ def shape_train_predict(comparison_data, crit, epochs, verb=2):
         licch_stats(licch)
     return glob, loc, users_ids
 
-def ml_run(comparison_data, epochs, criterias, verb=2):
+def ml_run(comparison_data, epochs, criterias, resume, verb=2):
     """ Runs the ml algorithm for all CRITERIAS (global variable)
     
     comparison_data: output of fetch_data()
@@ -134,7 +132,8 @@ def ml_run(comparison_data, epochs, criterias, verb=2):
         print("\nPROCESSING", crit)
         glob, loc, users_ids = shape_train_predict( comparison_data, 
                                                     crit, 
-                                                    epochs, 
+                                                    epochs,
+                                                    resume, 
                                                     verb) 
         # putting in required shape for output
         out_glob = format_out_glob(glob, crit) 
@@ -206,5 +205,6 @@ class Command(BaseCommand):
             glob_scores, loc_scores = ml_run(   comparison_data, 
                                                 EPOCHS, 
                                                 CRITERIAS, 
+                                                RESUME,
                                                 verb=0)
             save_data(glob_scores, loc_scores)

@@ -22,18 +22,19 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 NAME = ""
-EPOCHS = 300
+EPOCHS = 1
 TRAIN = True 
-RESUME = False
+RESUME = True
 
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
         seedall(3)
         from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:100], 
+        glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
                                                     EPOCHS,
                                                     CRITERIAS, 
+                                                    RESUME,
                                                     verb=1)
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
