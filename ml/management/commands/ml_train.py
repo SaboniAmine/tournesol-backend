@@ -56,7 +56,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = True  # False to compute all data
+EXPERIMENT_MODE = False  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints/" 
 FILENAME = "models_weights"
@@ -64,7 +64,7 @@ PATH = FOLDER_PATH + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
-EPOCHS = 100
+EPOCHS = 150
 CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
              "layman_friendly", "diversity_inclusion", "backfire_risk", 
              "better_habits", "entertaining_relaxing"]

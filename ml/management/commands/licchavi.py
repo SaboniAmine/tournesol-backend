@@ -86,7 +86,6 @@ class Licchavi():
         # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
   
-    
     def set_params(self, **params):
         """ set training hyperparameters """
         #self.opt = params["opt"]
@@ -140,8 +139,8 @@ class Licchavi():
                                 self.w, # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}
         for node in self.nodes.values():
-            lrs = self.lr_s / len(node[0])
-            node[8] = self.opt( [   {'params': node[6]}, 
+            lrs = self.lr_s / len(node[0]) # FIXME
+            node[8] = self.opt( [   {'params': node[6]},
                                     {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
         if verb:
@@ -168,7 +167,7 @@ class Licchavi():
                                 self.w # 9: weight
                             ] for id, data in zip(user_ids, data_dic.values())}                   
         for node in self.nodes.values(): # set optimizers
-            lrs = self.lr_s / len(node[0])
+            lrs = self.lr_s / len(node[0]) # FIXME
             node[8] = self.opt( [   {'params': node[6]}, 
                                     {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
@@ -317,7 +316,7 @@ class Licchavi():
         const = 10  # just for visualisation (remove later)
         fit_scale = const 
         gen_scale = const  # node weights are used in addition
-        reg_scale = const * self.w0 
+        reg_scale = const * self.w0
 
         reg_loss = reg_scale * model_norm(self.general_model, self.pow_reg)  
 

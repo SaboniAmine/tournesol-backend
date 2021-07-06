@@ -32,7 +32,7 @@ def run_experiment(comparison_data):
     if TRAIN:
         seedall(4)
         from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
+        glob_scores, contributor_scores = ml_run(comparison_data[:], 
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
