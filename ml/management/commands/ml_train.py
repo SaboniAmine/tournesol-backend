@@ -1,6 +1,7 @@
 
 from os import EX_NOPERM
-from tournesol.models.video import ComparisonCriteriaScore, ContributorRating, ContributorRatingCriteriaScore, VideoCriteriaScore
+from tournesol.models.video import ComparisonCriteriaScore, ContributorRating, 
+from tournesol.models.video import ContributorRatingCriteriaScore, VideoCriteriaScore
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
@@ -41,9 +42,9 @@ Notations:
 
 Structure:
 - fetch_data() provides data from the database
-- ml_run() uses this data as input, trains via in_and_out()
+- ml_run() uses this data as input, trains via shape_train_predict()
      and returns video scores
-- save_data() takes these scores and save them
+- save_data() takes these scores and save them to the database
 - these 3 are called by Django at the end of this file
 
 USAGE:
@@ -57,7 +58,7 @@ USAGE:
 """
 # global variables
 
-EXPERIMENT_MODE = False  # False to compute all data
+EXPERIMENT_MODE = True  # False to compute all data
 
 FOLDER_PATH = "ml/checkpoints" 
 FILENAME = "models_weights"
@@ -74,14 +75,18 @@ def fetch_data():
     """ Fetches the data from the Comparisons model
 
     Returns:
-    - comparison_data: list of [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str, score: float, weight: float]
+    - comparison_data: list of 
+        [   contributor_id: int, video_id_1: int, video_id_2: int, 
+            criteria: str, score: float, weight: float  ]
     """
     comparison_data = [
-        [ccs.comparison.user_id, ccs.comparison.video_1_id, ccs.comparison.video_2_id, ccs.criteria, ccs.score, ccs.weight]
-        for ccs in ComparisonCriteriaScore.objects.all().prefetch_related("comparison") ]
+        [ccs.comparison.user_id, ccs.comparison.video_1_id, 
+            ccs.comparison.video_2_id, ccs.criteria, ccs.score, ccs.weight]
+        for ccs 
+        in ComparisonCriteriaScore.objects.all().prefetch_related("comparison")]
     return comparison_data
 
-def in_and_out(comparison_data, crit, epochs, verb=2):
+def shape_train_predict(comparison_data, crit, epochs, verb=2):
     ''' Trains models and returns video scores for one criteria
 
     comparison_data: output of fetch_data()
@@ -99,19 +104,19 @@ def in_and_out(comparison_data, crit, epochs, verb=2):
         nodes_dic, users_ids, vid_vidx = distribute_data_from_save( full_data, 
                                                                     crit, 
                                                                     fullpath)
-        flow = get_licchavi(len(vid_vidx), vid_vidx, crit) 
-        flow.load_and_update(nodes_dic, users_ids, fullpath)
+        licch = get_licchavi(len(vid_vidx), vid_vidx, crit) 
+        licch.load_and_update(nodes_dic, users_ids, fullpath)
     else:
         nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
-        flow = get_licchavi(len(vid_vidx), vid_vidx, crit)
-        flow.set_allnodes(nodes_dic, users_ids)
-    h = flow.train(epochs, verb=verb) 
-    glob, loc = flow.output_scores()
-    flow.save_models(fullpath)
+        licch = get_licchavi(len(vid_vidx), vid_vidx, crit)
+        licch.set_allnodes(nodes_dic, users_ids)
+    h = licch.train(epochs, verb=verb) 
+    glob, loc = licch.output_scores()
+    licch.save_models(fullpath)
     if EXPERIMENT_MODE:
-        flow.check() # some tests
-        print("nb_nodes", flow.nb_nodes)
-        flow.stat_s()
+        licch.check() # some tests
+        print("nb_nodes", licch.nb_nodes)
+        licch.stat_s()
     return glob, loc, users_ids
 
 def ml_run(comparison_data, epochs, verb=2):
@@ -120,19 +125,25 @@ def ml_run(comparison_data, epochs, verb=2):
     comparison_data: output of fetch_data()
 
     Returns:
-    - video_scores: list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
-    - contributor_rating_scores: list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
+    - video_scores: list of [video_id: int, criteria_name: str, 
+                                score: float, uncertainty: float]
+    - contributor_rating_scores: list of 
+    [   contributor_id: int, video_id: int, criteria_name: str, 
+        score: float, uncertainty: float]
     """ # not better to regroup contributors in same list or smthg ?
-    global_scores, local_scores = [], []
+    glob_scores, loc_scores = [], []
     for crit in CRITERIAS:
         print("\nPROCESSING", crit)
-        glob, loc, users_ids = in_and_out(comparison_data, crit, epochs, verb) # training, see "licchavi.py"
+        glob, loc, users_ids = shape_train_predict( comparison_data, 
+                                                    crit, 
+                                                    epochs, 
+                                                    verb) 
         # putting in required shape for output
         out_glob = format_out_glob(glob, crit) 
         out_loc = format_out_loc(loc, users_ids, crit) 
-        global_scores += out_glob
-        local_scores += out_loc
-    return global_scores, local_scores
+        glob_scores += out_glob
+        loc_scores += out_loc
+    return glob_scores, loc_scores
 
 def save_data(video_scores, contributor_rating_scores):
     """
@@ -151,11 +162,15 @@ def save_data(video_scores, contributor_rating_scores):
 
     rating_ids = {
         (contributor_id, video_id): rating_id
-        for rating_id, contributor_id, video_id in ContributorRating.objects.all().values_list("id", "user_id", "video_id")
+        for rating_id, contributor_id, video_id 
+        in ContributorRating.objects.all().values_list( "id", 
+                                                        "user_id", 
+                                                        "video_id")
     }
     ratings_to_create = set(
         (contributor_id, video_id)
-        for contributor_id, video_id, criteria_name, score, uncertainty in contributor_rating_scores
+        for contributor_id, video_id, criteria_name, score, uncertainty 
+        in contributor_rating_scores
         if (contributor_id, video_id) not in rating_ids
     )
     created_ratings = ContributorRating.objects.bulk_create([
@@ -178,7 +193,8 @@ def save_data(video_scores, contributor_rating_scores):
             score=score,
             uncertainty=uncertainty,
         )
-        for contributor_id, video_id, criteria, score, uncertainty in contributor_rating_scores
+        for contributor_id, video_id, criteria, score, uncertainty 
+        in contributor_rating_scores
     ])
 
 
@@ -210,21 +226,23 @@ class Command(BaseCommand):
             if TRAIN:
                 seedall(3)
                 comparison_data = fetch_data()
-                global_scores, contributor_scores = ml_run(comparison_data[:], EPOCHS, verb=1)
-                save_to_json(global_scores, contributor_scores, NAME)
+                glob_scores, contributor_scores = ml_run(comparison_data[:10000], 
+                                                            EPOCHS, 
+                                                            verb=1)
+                save_to_json(glob_scores, contributor_scores, NAME)
             else:
-                global_scores, contributor_scores = load_from_json(NAME)
+                glob_scores, contributor_scores = load_from_json(NAME)
             for c in contributor_scores:
                 if c[0]==6213:
                     print(c)
-            disp_one_by_line(global_scores[:10])
+            disp_one_by_line(glob_scores[:10])
             disp_one_by_line(contributor_scores[:10])
-            check_one(100, global_scores, contributor_scores)
-            print("global:", len(global_scores), "local:",  len(contributor_scores))
+            check_one(100, glob_scores, contributor_scores)
+            print("glob:", len(glob_scores), "local:",  len(contributor_scores))
 
 # =================== PRODUCTION ========================
         # just train on all data and predict if not experiment mode
         else: 
             comparison_data = fetch_data()
-            global_scores, local_scores = ml_run(comparison_data, EPOCHS, verb=0)
-            save_data(global_scores, local_scores)
+            glob_scores, loc_scores = ml_run(comparison_data, EPOCHS, verb=0)
+            save_data(glob_scores, loc_scores)

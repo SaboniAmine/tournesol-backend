@@ -61,7 +61,8 @@ class Licchavi():
     '''
     def __init__(self, nb_vids, dic, crit, gpu=False):
         ''' 
-        nb_vids: number of different videos rated by at least one contributor for this criteria
+        nb_vids: number of different videos rated by at least one contributor 
+                    for this criteria
         dic: dictionnary of {vID: idx}
         '''
         self.nb_params = nb_vids  # number of parameters of the model(= nb of videos)
@@ -123,7 +124,8 @@ class Licchavi():
         ''' Puts data in Licchavi and create a model for each node 
         
         data_distrib: data distributed by ml_train.distribute_data() 
-                       ie list of (vID1_batch, vID2_batch, rating_batch, single_vIDs_batch)
+                       ie list of (vID1_batch, vID2_batch, rating_batch, 
+                                                            single_vIDs_batch)
         users_id: list/array of users IDs in same order 
         '''
         nb = len(data_dic)
@@ -215,12 +217,14 @@ class Licchavi():
     
     def stat_s(self):
         ''' returns array of s values '''
-        l_s = [(round_loss(s, 2), id) for s, id in zip(self._all_nodes("s"), self.nodes.keys())]
+        l_s = [(round_loss(s, 2), id) for s, id in zip(self._all_nodes("s"), 
+                                                        self.nodes.keys() )]
         tens = torch.tensor(l_s)
         disp_one_by_line(l_s)
         tens = tens[:,0]
         print("mean of s: ", round_loss(torch.mean(tens), 2))
-        print("min and max of s: ", round_loss(torch.min(tens), 2), round_loss(torch.max(tens), 2))
+        print("min and max of s: ", round_loss(torch.min(tens), 2), 
+                                    round_loss(torch.max(tens), 2) )
         print("var of s: ", round_loss(torch.var(tens), 2))
 
     # ---------- methods for training ------------
@@ -358,7 +362,7 @@ class Licchavi():
                         gen_loss += node[9] * g  # node weight  * generalisation term
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
-                    reg_loss *= reg_scale       
+                    reg_loss *= reg_scale        
                     loss = gen_loss + reg_loss
                     # print(self.general_model)
 
@@ -394,7 +398,8 @@ class Licchavi():
 def get_licchavi(nb_vids, dic, crit, gpu=False):
     ''' Returns a Licchavi (ml decentralized structure)
 
-    nb_vids: number of different videos rated by at least one contributor for this criteria
+    nb_vids: number of different videos rated by at least one contributor 
+                for this criteria
     dic: dictionnary of {vID: idx}
     crit: criteria of users rating
 

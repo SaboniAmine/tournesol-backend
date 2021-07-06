@@ -50,8 +50,10 @@ def models_dist(model1, model2, pow=(1,1), mask=None):
     q, p = pow
     if mask is None:
         mask = [torch.ones_like(param) for param in [model1]]
-    dist = sum((((theta - rho) * coef)**q).abs().sum() for theta, rho, coef in 
-                  zip([model1], [model2], mask))**p
+    dist = sum(
+                (((theta - rho) * coef)**q).abs().sum() for theta, rho, coef 
+                                        in zip([model1], [model2], mask)
+                )**p
     return dist
 
 def model_norm(model, pow=(2,1)): 

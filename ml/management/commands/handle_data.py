@@ -13,9 +13,12 @@ def select_criteria(comparison_data, crit):
         
     Returns: 
     - list of all ratings for this criteria
-        (one element is [contributor_id: int, video_id_1: int, video_id_2: int, criteria: str (crit), score: float, weight: float])
+        ie list of [contributor_id: int, video_id_1: int, video_id_2: int, 
+                    criteria: str (crit), score: float, weight: float]  
     '''
-    l_ratings = [comp for comp in comparison_data if (comp[3] == crit and comp[4] is not None)]
+    l_ratings = [comp for comp 
+                        in comparison_data 
+                        if (comp[3] == crit and comp[4] is not None)]
     return l_ratings
 
 def shape_data(l_ratings):
@@ -25,19 +28,21 @@ def shape_data(l_ratings):
 
     Returns : one array with 4 columns : userID, vID1, vID2, rating ([-1,1]) 
     '''
-    l_cleared = [rating[:3] + [rescale_rating(rating[4])] for rating in l_ratings]
-    arr = np.asarray(l_cleared)
+    l_clear = [rating[:3] + [rescale_rating(rating[4])] for rating in l_ratings]
+    arr = np.asarray(l_clear)
     return arr
 
 def distribute_data(arr, gpu=False): # change to add user ID to tuple
     ''' Distributes data on nodes according to user IDs for one criteria
-        Output is not compatible with previously stored models, starts from scratch
+        Output is not compatible with previously stored models, 
+           ie starts from scratch
 
     arr: np 2D array of all ratings for all users for one criteria
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - dictionnary {userID: (vID1_batch, vID2_batch, 
+                            rating_batch, single_vIDs, masks)}
     - array of user IDs
     - dictionnary of {vID: video idx}
     '''
@@ -69,11 +74,11 @@ def distribute_data_from_save(arr, crit, fullpath, gpu=False):
             (one line is [userID, vID1, vID2, score])
 
     Returns:
-    - dictionnary {userID: (vID1_batch, vID2_batch, rating_batch, single_vIDs, masks)}
+    - dictionnary {userID: (vID1_batch, vID2_batch, 
+                            rating_batch, single_vIDs, masks)}
     - array of user IDs
     - dictionnary of {vID: video idx}
     '''
-    # fullpath = path + '_' + crit
     _, dic_old, _, _ = torch.load(fullpath) # loading previous data
 
     arr = sort_by_first(arr) # sorting by user IDs
@@ -96,8 +101,6 @@ def distribute_data_from_save(arr, crit, fullpath, gpu=False):
         nodes_dic[id] = (batch1, batch2, batchout, batchvids, mask)
     return nodes_dic, user_ids, vid_vidx
 
-
-
 def format_out_glob(glob, crit):
     ''' Puts data in list of global scores (one criteria)
     
@@ -105,12 +108,14 @@ def format_out_glob(glob, crit):
     crit: criteria
     
     Returns: 
-    - list of [video_id: int, criteria_name: str, score: float, uncertainty: float]
+    - list of [video_id: int, criteria_name: str, 
+                score: float, uncertainty: float]
     '''
     l_out = []
     ids, scores = glob
     for i in range(len(ids)):
-        out = [int(ids[i]), crit, round(scores[i].item(), 2), 0] # uncertainty is 0 for now
+         # uncertainty is 0 for now
+        out = [int(ids[i]), crit, round(scores[i].item(), 2), 0]
         l_out.append(out)
     return l_out
 
@@ -121,13 +126,15 @@ def format_out_loc(loc, users_ids, crit):
     users_ids: list/array of user IDs in same order
     
     Returns : 
-    - list of [contributor_id: int, video_id: int, criteria_name: str, score: float, uncertainty: float]
+    - list of [contributor_id: int, video_id: int, criteria_name: str, 
+                score: float, uncertainty: float]
     '''
     l_out = []
     vids, scores = loc
     for user_id, user_vids, user_scores in zip(users_ids, vids, scores):
         for i in range(len(user_vids)):
+            # uncertainty is 0 for now
             out = [int(user_id), int(user_vids[i].item()), 
-                    crit, round(user_scores[i].item(), 2), 0] # uncertainty is 0 for now
+                    crit, round(user_scores[i].item(), 2), 0] 
             l_out.append(out)
     return l_out
