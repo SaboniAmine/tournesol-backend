@@ -70,7 +70,7 @@ class Licchavi():
         self.criteria = crit # criteria learnt by this Licchavi
 
         self.opt = torch.optim.SGD
-        speed = 1
+        speed = 1 # for tests, to remove
         self.lr_node = speed*0.5     # local learning rate (local scores)
         self.lr_s = speed*0.0001     # local learning rate for s parameter
         self.lr_gen = speed*0.1  # global learning rate (global scores)
@@ -92,7 +92,17 @@ class Licchavi():
         # self.size = nb_params(self.general_model) / 10_000
         self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
         # ("fit", "gen", "reg", "acc", "l2_dist", "l2_norm", "grad_sp", "grad_norm")
-        
+    
+    def set_params(self, **params):
+        """ set training hyperparameters """
+        self.opt = params["opt"]
+        self.lr_node = params["lr_node"]    # local learning rate (local scores)
+        self.lr_s = params["lr_s"]    # local learning rate for s parameter
+        self.lr_gen = params["lr_gen"]  # global learning rate (global scores)
+        self.gen_freq = params["gen_freq"] # generalisation frequency (>=1)
+        self.w0 = params["w0"]      # regularisation strength
+        self.w = params["w"]    # default weight for a node
+
     # ------------ input and output --------------------
     def _get_default(self):
         ''' Returns: - (default s, default model, default age) '''
@@ -228,8 +238,8 @@ class Licchavi():
         print("var of s: ", round_loss(torch.var(tens), 2))
 
     # ---------- methods for training ------------
-    def _set_lr(self):
-        ''' sets learning rates of optimizers according to Licchavi setting '''
+    def _set_lr(self): # DOESNT UPDATE S LRs
+        ''' sets learning rates of optimizers according to Licchavi settings '''
         for node in self.nodes.values(): 
             node[8].param_groups[0]['lr'] = self.lr_node # node optimizer
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen

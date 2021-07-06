@@ -14,9 +14,7 @@ from .licchavi import get_licchavi
 from .handle_data import select_criteria, shape_data
 from .handle_data import distribute_data, distribute_data_from_save
 from .handle_data import format_out_loc, format_out_glob
-from .data_utility import save_to_json, load_from_json
-from .visualisation import disp_one_by_line, seedall, check_one
-from .experiments import licch_stats
+from .experiments import run_experiment, licch_stats
 
 """
 Machine Learning main python file
@@ -56,6 +54,8 @@ USAGE:
 - call ml_run(fetch_data()) if you just want the scores in python
 
 """
+def foo():
+    pass
 # global variables
 
 EXPERIMENT_MODE = True  # False to compute all data
@@ -117,7 +117,7 @@ def shape_train_predict(comparison_data, crit, epochs, verb=2):
         licch_stats(licch)
     return glob, loc, users_ids
 
-def ml_run(comparison_data, epochs, verb=2):
+def ml_run(comparison_data, epochs, criterias, verb=2):
     """ Runs the ml algorithm for all CRITERIAS (global variable)
     
     comparison_data: output of fetch_data()
@@ -130,7 +130,7 @@ def ml_run(comparison_data, epochs, verb=2):
         score: float, uncertainty: float]
     """ # not better to regroup contributors in same list or smthg ?
     glob_scores, loc_scores = [], []
-    for crit in CRITERIAS:
+    for crit in criterias:
         print("\nPROCESSING", crit)
         glob, loc, users_ids = shape_train_predict( comparison_data, 
                                                     crit, 
@@ -195,52 +195,16 @@ def save_data(video_scores, contributor_rating_scores):
         in contributor_rating_scores
     ])
 
-
-# ============= for experiments only ========= production code below this
-
-if EXPERIMENT_MODE:
-    CRITERIAS = ["reliability"]
-    TEST_DATA = [
-                    [0, 100, 101, "reliability", 100, 0],
-                    [0, 101, 110, "reliability", 0, 0],
-                    [1, 100, 101, "importance", 100, 0],
-                    [1, 100, 101, "reliability", 100, 0],
-                    [1, 102, 103, "reliability", 70, 0],
-                    [2, 104, 105, "reliability", 50, 0],
-                    [3, 106, 107, "reliability", 30, 0],
-                    [4, 108, 109, "reliability", 30, 0],
-                    # [67, 200, 201, "reliability", 0, 0]
-                ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
-
-    NAME = ""
-    EPOCHS = 100
-    TRAIN = True 
-    RESUME = False
     
 class Command(BaseCommand):
     help = 'Runs the ml'
     def handle(self, *args, **options):
+        comparison_data = fetch_data()
         if EXPERIMENT_MODE: 
-            if TRAIN:
-                seedall(3)
-                comparison_data = fetch_data()
-                glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
-                                                            EPOCHS, 
-                                                            verb=2)
-                save_to_json(glob_scores, contributor_scores, NAME)
-            else:
-                glob_scores, contributor_scores = load_from_json(NAME)
-            for c in contributor_scores:
-                if c[0]==6213:
-                    print(c)
-            disp_one_by_line(glob_scores[:10])
-            disp_one_by_line(contributor_scores[:10])
-            check_one(100, glob_scores, contributor_scores)
-            print("glob:", len(glob_scores), "local:",  len(contributor_scores))
-
-# =================== PRODUCTION ========================
-        # just train on all data and predict if not experiment mode
+            run_experiment(comparison_data)
         else: 
-            comparison_data = fetch_data()
-            glob_scores, loc_scores = ml_run(comparison_data, EPOCHS, verb=0)
+            glob_scores, loc_scores = ml_run(   comparison_data, 
+                                                EPOCHS, 
+                                                CRITERIAS, 
+                                                verb=0)
             save_data(glob_scores, loc_scores)
