@@ -1,6 +1,6 @@
 
 from os import EX_NOPERM
-from tournesol.models.video import ComparisonCriteriaScore, ContributorRating, 
+from tournesol.models.video import ComparisonCriteriaScore, ContributorRating
 from tournesol.models.video import ContributorRatingCriteriaScore, VideoCriteriaScore
 from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full

@@ -8,7 +8,6 @@ from .metrics import extract_grad, sp
 from .data_utility import expand_tens, one_hot_vids
 from .visualisation import disp_one_by_line
 
-
 """
 Machine Learning algorithm, used in "ml_train"
 
