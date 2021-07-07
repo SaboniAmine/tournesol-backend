@@ -88,7 +88,7 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
 
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
-    
+    resume: bool, resume previous processing
     Returns :   
     - (tensor of all vIDS , tensor of global video scores)
     - (list of tensor of local vIDs , list of tensors of local video scores)
@@ -125,7 +125,7 @@ def ml_run(comparison_data, epochs, criterias, resume, verb=2):
     - contributor_rating_scores: list of 
     [   contributor_id: int, video_id: int, criteria_name: str, 
         score: float, uncertainty: float]
-    """ # not better to regroup contributors in same list or smthg ?
+    """ # FIXME: not better to regroup contributors in same list or smthg ?
     glob_scores, loc_scores = [], []
     for crit in criterias:
         logging.info("PROCESSING " + crit)
