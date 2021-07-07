@@ -1,6 +1,8 @@
-import matplotlib.pyplot as plt
-import numpy as np 
-from copy import deepcopy
+import os
+TOURNESOL_DEV = bool(int(os.environ.get("TOURNESOL_DEV", 0)))
+if TOURNESOL_DEV:  # safety net to ensure pyplot is never loaded in production
+    import matplotlib.pyplot as plt
+    import numpy as np 
 
 INTENS = 0.4
 # tuple of label, ordinate legend, filename

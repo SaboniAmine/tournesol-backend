@@ -47,7 +47,6 @@ Structure:
 
 USAGE:
 - define global variables EPOCHS, CRITERIAS
-- set EXPERIMENT_MODE to False
 - set RESUME to True if you want to use previously trained models 
 -- EPOCHS: number of training epochs
 -- CRITERIAS: list of str (there is one training for each criteria)
@@ -55,8 +54,7 @@ USAGE:
 
 """
 # global variables
-
-EXPERIMENT_MODE = False  # False to compute all data
+TOURNESOL_DEV = bool(int(os.environ.get("TOURNESOL_DEV", 0))) # dev mode ?
 
 FOLDER_PATH = "ml/checkpoints/" 
 FILENAME = "models_weights"
@@ -111,7 +109,7 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
     h = licch.train(epochs, verb=verb) 
     glob, loc = licch.output_scores()
     licch.save_models(fullpath)
-    if EXPERIMENT_MODE:
+    if TOURNESOL_DEV:
         licch_stats(licch)
     return glob, loc, users_ids
 
@@ -199,7 +197,7 @@ class Command(BaseCommand):
     help = 'Runs the ml'
     def handle(self, *args, **options):
         comparison_data = fetch_data()
-        if EXPERIMENT_MODE: 
+        if TOURNESOL_DEV: 
             run_experiment(comparison_data)
         else: 
             glob_scores, loc_scores = ml_run(   comparison_data, 
@@ -208,4 +206,3 @@ class Command(BaseCommand):
                                                 RESUME,
                                                 verb=0)
             save_data(glob_scores, loc_scores)
-            

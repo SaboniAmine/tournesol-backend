@@ -1,5 +1,11 @@
 from torch import optim
 
+"""
+To set hyperparameters for Licchavi object in "licchavi.py"
+
+Main file is "ml_train.py"
+"""
+
 def get_defaults():
     """ defaults training parameters """
     defaults = {
@@ -15,4 +21,3 @@ def get_defaults():
                 #"nb_epochs": 100 # int >= 1, number of training epochs
                 }
     return defaults
-    

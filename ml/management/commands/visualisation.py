@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 """
-Visualisation methods, mainly for test and debugging
+Visualisation methods, mainly for testing and debugging
 
 Main file is "ml_train.py"
 """
@@ -33,4 +33,3 @@ def disp_one_by_line(it):
     ''' prints one iteration by line '''
     for obj in it:
         print(obj)
-        

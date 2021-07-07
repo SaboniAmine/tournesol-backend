@@ -5,6 +5,10 @@ from .plots import plot_metrics
 from .data_utility import save_to_json, load_from_json
 from .visualisation import seedall, check_one, disp_one_by_line
 
+"""
+Module called from "ml_train.py" only if TOURNESOL_DEV is True
+Used to perform some tests on ml algorithm (custom data, ...)
+"""
 
 PATH_PLOTS = "ml/plots/"
 makedirs(PATH_PLOTS, exist_ok=True)
@@ -55,4 +59,3 @@ def licch_stats(licch):
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
     plot_metrics([h], path=PATH_PLOTS)
-    
