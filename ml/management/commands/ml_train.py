@@ -54,7 +54,7 @@ USAGE:
 
 """
 # global variables
-TOURNESOL_DEV = bool(int(os.environ.get("TOURNESOL_DEV", 0))) # dev mode ?
+TOURNESOL_DEV = bool(int(os.environ.get("TOURNESOL_DEV", 0))) # dev mode
 
 FOLDER_PATH = "ml/checkpoints/" 
 FILENAME = "models_weights"

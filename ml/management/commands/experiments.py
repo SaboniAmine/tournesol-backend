@@ -6,7 +6,9 @@ from .data_utility import save_to_json, load_from_json
 from .visualisation import seedall, check_one, disp_one_by_line
 
 """
-Module called from "ml_train.py" only if TOURNESOL_DEV is True
+Not used in production, for testing only
+Module called from "ml_train.py" only if env var TOURNESOL_DEV is True
+
 Used to perform some tests on ml algorithm (custom data, ...)
 """
 

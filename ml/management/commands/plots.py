@@ -4,12 +4,18 @@ if TOURNESOL_DEV:  # safety net to ensure pyplot is never loaded in production
     import matplotlib.pyplot as plt
     import numpy as np 
 
+"""
+Not used in production, for testing only
+Used in "experiments.py"
+
+Main file is "ml_train.py"
+"""
+
 INTENS = 0.4
-# tuple of label, ordinate legend, filename
+# tuple of dic of label, ordinate legend, filename
 METRICS = ({"lab":"fit", "ord": "Training Loss", "f_name": "loss"}, 
            {"lab":"gen", "ord": "Training Loss", "f_name": "loss"}, 
            {"lab":"reg", "ord": "Training Loss", "f_name": "loss"}, 
-           #{"lab":"acc", "ord": "Accuracy", "f_name": "acc"}, 
            {"lab":"l2_dist", "ord": "l2 norm", "f_name": "l2dist"}, 
            {"lab":"l2_norm", "ord": "l2 norm", "f_name": "l2dist"}, 
            {"lab":"grad_sp", "ord": "Scalar Product", "f_name": "grad"}, 
@@ -23,7 +29,7 @@ def get_style():
         yield l[i % 4]
 
 def get_color():
-    '''gives different line styles for plots'''
+    '''gives different line colors for plots'''
     l = ["red","green","blue","grey"]
     for i in range(10000):
         yield l[i % 4]
@@ -44,27 +50,6 @@ def legendize(y):
     plt.ylabel(y)
     plt.legend()
 
-# def clean_dic(dic):
-#     ''' replace some values by more readable ones '''
-#     if "opt" in dic.keys():
-#         dic = deepcopy(dic)
-#         op = dic["opt"]
-#         dic["opt"] = "Adam" if op == optim.Adam else "SGD" if op == optim.SGD 
-#                                                 else None
-#     return dic
-
-# def get_title(conf, ppl=4):
-#     ''' converts a dictionnary in str of approriate shape 
-#         ppl : parameters per line
-#     '''
-#     title = ""
-#     c = 0 # enumerate ?
-#     for key, val in clean_dic(conf).items(): 
-#         c += 1
-#         title += "{}: {}".format(key,val)
-#         title += " \n" if (c % ppl) == 0 else ', '
-#     return title[:-2]
-
 def means_bounds(arr):
     '''  
     arr: 2D array of values (one line is one run)
@@ -79,7 +64,6 @@ def means_bounds(arr):
     low, up = means - var, means + var
     return means, low, up
 
-
 # ----------- to display multiple accuracy curves on same plot -----------
 def add_acc_var(arr, label):
     ''' from array add curve of accuracy '''
@@ -88,21 +72,6 @@ def add_acc_var(arr, label):
     epochs = range(1, len(means) + 1)
     plt.plot(epochs, means, label=label, linestyle=next(STYLES))
     plt.fill_between(epochs, up, low, alpha=0.4)
-
-def plot_runs_acc(l_runs, title=None, path=None, **kwargs):
-    ''' plot several acc_var on one graph '''
-    arr = np.asarray(l_runs)
-    l_param = get_possibilities(**kwargs) # for legend
-    # adding one curve for each parameter combination (each run)
-    for run, param in zip(arr, l_param): 
-        add_acc_var(run, param)
-    plt.ylim([0,1])
-    plt.grid(True, which='major', linewidth=1, axis='y', alpha=1)
-    plt.minorticks_on()
-    plt.grid(True, which='minor', linewidth=0.8, axis='y', alpha=0.8)
-    legendize("Test Accuracy")
-    title_save(title, path, suff=".png")
-    plt.show()
 
 # ------------- utility for what follows -------------------------
 def plot_var(l_hist, l_idx):
