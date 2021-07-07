@@ -20,7 +20,15 @@ def predict(input, tens):
 
 # losses (used in licchavi.py)
 def fbbt(t,r):
-    ''' fbbt loss function '''
+    ''' fbbt loss function 
+
+    Args:
+        t (float tensor): s * (ya - yb).
+        r (float tensor): rating given by user.
+
+    Returns:
+        float tensor: empirical loss for one comparison.
+    '''
     return torch.log(abs(torch.sinh(t)/t)) + r * t + torch.log(torch.tensor(2))
 
 def hfbbt(t,r):
