@@ -131,14 +131,6 @@ def loss_var(l_hist, title=None, path=None):
     ''' plot losses with variance from a list of historys '''
     plotfull_var(l_hist, [0,1,2], title, path)
 
-# def acc_var(l_hist, title=None, path=None):
-#     ''' plot accuracy with variance from a list of historys '''
-#     plt.ylim([0,1])
-#     plt.grid(True, which='major', linewidth=1, axis='y', alpha=1)
-#     plt.minorticks_on()
-#     plt.grid(True, which='minor', linewidth=0.8, axis='y', alpha=0.8)
-#     plotfull_var(l_hist, [3], title, path)
-
 def l2_var(l_hist, title=None, path=None):
     '''plot l2 norm of gen model from a list of historys'''
     plotfull_var(l_hist, [3,4], title, path)
@@ -151,8 +143,7 @@ def gradsp_var(l_hist, title=None, path=None):
 
 # plotting all we have
 def plot_metrics(l_hist, title=None, path=None):
-    '''plot and save the different metrics from list of historys'''
-    # acc_var(l_hist, title, path)  
+    '''plot and save the different metrics from list of historys'''  
     loss_var(l_hist, title, path)
     l2_var(l_hist, title, path)
     gradsp_var(l_hist, title, path)

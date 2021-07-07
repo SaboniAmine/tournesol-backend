@@ -33,3 +33,4 @@ def disp_one_by_line(it):
     ''' prints one iteration by line '''
     for obj in it:
         print(obj)
+        

@@ -15,3 +15,4 @@ def get_defaults():
                 #"nb_epochs": 100 # int >= 1, number of training epochs
                 }
     return defaults
+    

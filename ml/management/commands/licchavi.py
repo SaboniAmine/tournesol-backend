@@ -413,3 +413,4 @@ def get_licchavi(nb_vids, dic, crit, gpu=False):
     params = get_defaults() # defaults hyperparameters from "hyperparameters.py"
     licch.set_params(**params)
     return licch
+    

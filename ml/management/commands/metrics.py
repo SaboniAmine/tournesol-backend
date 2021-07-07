@@ -25,7 +25,3 @@ def sp(l_grad1, l_grad2):
 def nb_params(model):
     ''' returns number of parameters of a model '''
     return sum(p.numel() for p in [model])
-
-# def tens_count(tens, val):
-#     ''' counts nb of -val in tensor -tens '''
-#     return len(tens) - round_loss(torch.count_nonzero(tens-val))

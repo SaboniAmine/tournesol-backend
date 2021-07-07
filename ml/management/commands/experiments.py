@@ -55,3 +55,4 @@ def licch_stats(licch):
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
     plot_metrics([h], path=PATH_PLOTS)
+    

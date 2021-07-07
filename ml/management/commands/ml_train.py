@@ -208,3 +208,4 @@ class Command(BaseCommand):
                                                 RESUME,
                                                 verb=0)
             save_data(glob_scores, loc_scores)
+            

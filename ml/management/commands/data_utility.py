@@ -118,3 +118,4 @@ def load_from_pickle(name="pickle"):
     with open(filename, 'rb') as filehandler:
         obj = pickle.load(filehandler)
     return obj
+    
