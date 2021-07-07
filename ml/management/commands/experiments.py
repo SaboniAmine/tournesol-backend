@@ -1,5 +1,5 @@
 from os import makedirs
-from torch import optim
+import torch
 
 from .plots import plot_metrics 
 from .data_utility import save_to_json, load_from_json
@@ -29,7 +29,7 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 NAME = ""
-EPOCHS = 200
+EPOCHS = 20
 TRAIN = True 
 RESUME = False
 
@@ -38,7 +38,7 @@ def run_experiment(comparison_data):
     if TRAIN:
         seedall(4)
         from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:], 
+        glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -61,3 +61,14 @@ def licch_stats(licch):
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
     plot_metrics([h], path=PATH_PLOTS)
+
+def scores_stats(glob_scores):
+    ''' gives statistics on global scores
+    
+    glob_scores: torch tensor of global scores
+    '''
+    var = torch.var(glob_scores)
+    mini, maxi = (torch.min(glob_scores).item(),  
+                torch.max(glob_scores).item() )
+    print("minimax:", mini,maxi)
+    print("variance of global scores :", var.item())

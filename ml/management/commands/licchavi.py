@@ -143,7 +143,7 @@ class Licchavi():
             node[8] = self.opt( [   {'params': node[6]},
                                     {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
-        if verb:
+        if verb>=1:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
     def load_and_update(self, data_dic, user_ids, fullpath, verb=1):
@@ -171,7 +171,7 @@ class Licchavi():
             node[8] = self.opt( [   {'params': node[6]}, 
                                     {'params': node[5], 'lr': lrs},
                                         ], lr=self.lr_node)
-        if verb:
+        if verb>=1:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
     def output_scores(self):
@@ -185,11 +185,6 @@ class Licchavi():
         list_ids_batchs = []
         with torch.no_grad():
             glob_scores = self.general_model
-            var = torch.var(glob_scores)
-            mini, maxi = (torch.min(glob_scores).item(),  
-                            torch.max(glob_scores).item() )
-            print("minimax:", mini,maxi)
-            print("variance of global scores :", var.item())
             for node in self.nodes.values():
                 input = one_hot_vids(self.vid_vidx, node[3])
                 output = predict(input, node[6]) 
@@ -323,7 +318,7 @@ class Licchavi():
         # training loop 
         nb_steps = self.gen_freq + 1
         for epoch in range(1, nb_epochs + 1):
-            if verb: print("\nepoch {}/{}".format(epoch, nb_epochs))
+            if verb>=1: print("\nepoch {}/{}".format(epoch, nb_epochs))
             time_ep = time()
 
             for step in range(1, nb_steps + 1):
@@ -378,10 +373,10 @@ class Licchavi():
 
             self._update_hist(epoch, fit_loss, gen_loss, reg_loss, verb)
             self._old(1)  # aging all nodes of 1 epoch
-            if verb: print("epoch time :", round(time() - time_ep, 2)) 
+            if verb>=1: print("epoch time :", round(time() - time_ep, 2)) 
 
         # ----------------- end of training -------------------------------  
-        print("training time :", round(time() - time_train, 2)) 
+        if verb>=0: print("training time :", round(time() - time_train, 2)) 
         return self.history # self.train() returns lists of metrics
 
     # ------------ to check for problems --------------------------

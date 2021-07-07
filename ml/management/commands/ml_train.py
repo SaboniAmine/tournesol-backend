@@ -9,6 +9,7 @@ from tournesol.models import Comparison
 from settings.settings import VIDEO_FIELDS
 
 import os
+import logging
 
 from .licchavi import get_licchavi
 from .handle_data import select_criteria, shape_data
@@ -62,7 +63,7 @@ PATH = FOLDER_PATH + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
-EPOCHS = 150
+EPOCHS = 1
 CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
              "layman_friendly", "diversity_inclusion", "backfire_risk", 
              "better_habits", "entertaining_relaxing"]
@@ -101,11 +102,11 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
                                                                     crit, 
                                                                     fullpath)
         licch = get_licchavi(len(vid_vidx), vid_vidx, crit) 
-        licch.load_and_update(nodes_dic, users_ids, fullpath)
+        licch.load_and_update(nodes_dic, users_ids, fullpath, verb)
     else:
         nodes_dic, users_ids, vid_vidx = distribute_data(full_data)
         licch = get_licchavi(len(vid_vidx), vid_vidx, crit)
-        licch.set_allnodes(nodes_dic, users_ids)
+        licch.set_allnodes(nodes_dic, users_ids, verb)
     h = licch.train(epochs, verb=verb) 
     glob, loc = licch.output_scores()
     licch.save_models(fullpath)
@@ -127,7 +128,7 @@ def ml_run(comparison_data, epochs, criterias, resume, verb=2):
     """ # not better to regroup contributors in same list or smthg ?
     glob_scores, loc_scores = [], []
     for crit in criterias:
-        print("\nPROCESSING", crit)
+        logging.info("PROCESSING " + crit)
         glob, loc, users_ids = shape_train_predict( comparison_data, 
                                                     crit, 
                                                     epochs,
@@ -204,5 +205,5 @@ class Command(BaseCommand):
                                                 EPOCHS, 
                                                 CRITERIAS, 
                                                 RESUME,
-                                                verb=0)
+                                                verb=-1)
             save_data(glob_scores, loc_scores)
