@@ -1,7 +1,7 @@
 from os import makedirs
 import torch
 
-from .plots import plot_metrics 
+from .plots import plot_metrics, plot_density
 from .data_utility import save_to_json, load_from_json
 from .visualisation import seedall, check_one, disp_one_by_line
 
@@ -29,7 +29,7 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 NAME = ""
-EPOCHS = 20
+EPOCHS = 1
 TRAIN = True 
 RESUME = True
 
@@ -38,7 +38,7 @@ def run_experiment(comparison_data):
     if TRAIN:
         seedall(4)
         from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:1000], 
+        glob_scores, contributor_scores = ml_run(comparison_data[:], 
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -60,6 +60,13 @@ def licch_stats(licch):
     h = licch.history
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
+    with torch.no_grad():
+        gen_s = licch.all_nodes("s")
+        l_s = [s.item() for s in gen_s]
+        plot_density(   l_s, 
+                        "s parameters", 
+                        PATH_PLOTS,
+                        "s_params.png")
     plot_metrics([h], path=PATH_PLOTS)
 
 def scores_stats(glob_scores):
@@ -72,4 +79,5 @@ def scores_stats(glob_scores):
                 torch.max(glob_scores).item() )
     print("minimax:", mini,maxi)
     print("variance of global scores :", var.item())
-
+    with torch.no_grad():
+        plot_density(glob_scores, "Global scores", PATH_PLOTS, "scores.png")

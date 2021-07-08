@@ -144,4 +144,3 @@ def format_out_loc(loc, users_ids, crit):
                     crit, round(user_scores[i].item(), 2), 0] 
             l_out.append(out)
     return l_out
-    

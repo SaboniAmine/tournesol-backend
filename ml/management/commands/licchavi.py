@@ -201,14 +201,14 @@ class Licchavi():
                         )
         torch.save(saved_data, fullpath)
     # --------- utility --------------
-    def _all_nodes(self, key):
+    def all_nodes(self, key):
         ''' get a generator of one parameter for all nodes '''
         for node in self.nodes.values():
             yield getattr(node, key)
     
     def stat_s(self):
         ''' print s stats '''
-        l_s = [(round_loss(s, 2), id) for s, id in zip(self._all_nodes("s"), 
+        l_s = [(round_loss(s, 2), id) for s, id in zip(self.all_nodes("s"), 
                                                         self.nodes.keys() )]
         tens = torch.tensor(l_s)
         disp_one_by_line(l_s)

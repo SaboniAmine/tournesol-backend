@@ -112,9 +112,17 @@ def gradsp_var(l_hist, title=None, path=None):
     '''
     plotfull_var(l_hist, [5,6], title, path)
 
-# plotting all we have
+# plotting all metrics we have
 def plot_metrics(l_hist, title=None, path=None):
     '''plot and save the different metrics from list of historys'''  
     loss_var(l_hist, title, path)
     l2_var(l_hist, title, path)
     gradsp_var(l_hist, title, path)
+
+# histogram
+def plot_density(tens, title=None, path=None, name="hist.png"):
+    arr = np.asarray(tens)
+    _ = plt.hist(arr, density=False, bins=40)
+    legendize("density")
+    title_save(title, path, name)
+    plt.clf()
