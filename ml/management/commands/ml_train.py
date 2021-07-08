@@ -15,7 +15,7 @@ from .licchavi import get_licchavi
 from .handle_data import select_criteria, shape_data
 from .handle_data import distribute_data, distribute_data_from_save
 from .handle_data import format_out_loc, format_out_glob
-from .experiments import run_experiment, licch_stats
+from .experiments import run_experiment, licch_stats, scores_stats
 
 """
 Machine Learning main python file
@@ -110,8 +110,9 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
     h = licch.train(epochs, verb=verb) 
     glob, loc = licch.output_scores()
     licch.save_models(fullpath)
-    if TOURNESOL_DEV:
+    if TOURNESOL_DEV: # some prints and plots
         licch_stats(licch)
+        scores_stats(glob[1])
     return glob, loc, users_ids
 
 def ml_run(comparison_data, epochs, criterias, resume, verb=2):

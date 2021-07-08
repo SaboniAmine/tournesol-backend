@@ -31,7 +31,7 @@ TEST_DATA = [
 NAME = ""
 EPOCHS = 20
 TRAIN = True 
-RESUME = False
+RESUME = True
 
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
@@ -51,11 +51,11 @@ def run_experiment(comparison_data):
             print(c)
     disp_one_by_line(glob_scores[:10])
     disp_one_by_line(contributor_scores[:10])
-    check_one(100, glob_scores, contributor_scores)
+    check_one(5534, glob_scores, contributor_scores)
     print("glob:", len(glob_scores), "local:",  len(contributor_scores))
 
 def licch_stats(licch):
-    ''' gives some statistics about licchavi object '''
+    ''' gives some statistics about Licchavi object '''
     licch.check() # some tests
     h = licch.history
     print("nb_nodes", licch.nb_nodes)
@@ -72,3 +72,4 @@ def scores_stats(glob_scores):
                 torch.max(glob_scores).item() )
     print("minimax:", mini,maxi)
     print("variance of global scores :", var.item())
+

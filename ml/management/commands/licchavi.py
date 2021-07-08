@@ -8,6 +8,7 @@ from .metrics import extract_grad, sp
 from .data_utility import expand_tens, one_hot_vids
 from .visualisation import disp_one_by_line
 from .hyperparameters import get_defaults
+from .nodes import Node
 
 """
 Machine Learning algorithm, used in "ml_train.py"
@@ -133,16 +134,14 @@ class Licchavi():
         nb = len(data_dic)
         self.nb_nodes = nb
         self.users = user_ids
-        self.nodes = { id:  [   *data, # 0 to 4: vID1, vID2, r, vIDs, mask
-                                *self._get_default(), # 5 to 7: s, model, age
-                                None,  # 8: optimizer
-                                self.w, # 9: weight
-                            ] for id, data in zip(user_ids, data_dic.values())}
-        for node in self.nodes.values():
-            lrs = self.lr_s / len(node[0]) # FIXME
-            node[8] = self.opt( [   {'params': node[6]},
-                                    {'params': node[5], 'lr': lrs},
-                                        ], lr=self.lr_node)
+        self.nodes = {id: Node( *data, 
+                                *self._get_default(), 
+                                self.w,
+                                self.lr_node,
+                                self.lr_s,
+                                self.opt
+                        ) for id, data in zip(user_ids, data_dic.values())}
+                            
         if verb>=1:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
@@ -159,18 +158,14 @@ class Licchavi():
         self.users = user_ids
         nbn = len(user_ids)
         self.nb_nodes = nbn
-        
-        self.nodes = { id: [    *data, # 0 to 4: vID1, vID2, r, vIDs, mask
-                                # 5 to 7: s, model, age
+        self.nodes = {id: Node( *data, 
                                 *self._get_saved(loc_models_old, id, nb_new), 
-                                None, # 8: optimizer, defined below
-                                self.w # 9: weight
-                            ] for id, data in zip(user_ids, data_dic.values())}                   
-        for node in self.nodes.values(): # set optimizers
-            lrs = self.lr_s / len(node[0]) # FIXME
-            node[8] = self.opt( [   {'params': node[6]}, 
-                                    {'params': node[5], 'lr': lrs},
-                                        ], lr=self.lr_node)
+                                self.w,
+                                self.lr_node,
+                                self.lr_s,
+                                self.opt
+                        ) for id, data in zip(user_ids, data_dic.values())}
+                            
         if verb>=1:
             print("Total number of nodes : {}".format(self.nb_nodes))
 
@@ -186,18 +181,18 @@ class Licchavi():
         with torch.no_grad():
             glob_scores = self.general_model
             for node in self.nodes.values():
-                input = one_hot_vids(self.vid_vidx, node[3])
-                output = predict(input, node[6]) 
+                input = one_hot_vids(self.vid_vidx, node.vids)
+                output = predict(input, node.model) 
                 local_scores.append(output)
-                list_ids_batchs.append(node[3])
+                list_ids_batchs.append(node.vids)
             vids_batch = list(self.vid_vidx.keys())
         return (vids_batch, glob_scores), (list_ids_batchs, local_scores)
 
     def save_models(self, fullpath):
         ''' saves age and global and local weights, detached (no gradients) '''
-        local_data = {id:  (node[5],            # s
-                            node[6].detach(),   # model
-                            node[7]            # age
+        local_data = {id:  (node.s,            # s
+                            node.model.detach(),   # model
+                            node.age            # age
                         ) for id, node in self.nodes.items()}
         saved_data = (  self.criteria,
                         self.vid_vidx,
@@ -208,11 +203,8 @@ class Licchavi():
     # --------- utility --------------
     def _all_nodes(self, key):
         ''' get a generator of one parameter for all nodes '''
-        dic = {"userid": 0, "vid1": 1, "vid2": 2, "r": 3, "vids": 4, 
-                "s": 5, "model": 6, "age": 7, "opt": 8, "age": 9}
-        idx = dic[key]
         for node in self.nodes.values():
-            yield node[idx]
+            yield getattr(node, key)
     
     def stat_s(self):
         ''' print s stats '''
@@ -230,13 +222,13 @@ class Licchavi():
     def _set_lr(self): # DOESNT UPDATE S LRs
         ''' sets learning rates of optimizers according to Licchavi settings '''
         for node in self.nodes.values(): 
-            node[8].param_groups[0]['lr'] = self.lr_node # node optimizer
+            node.opt.param_groups[0]['lr'] = self.lr_node # node optimizer
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
 
     def _zero_opt(self):
         ''' resets gradients of all models '''
         for node in self.nodes.values():
-            node[8].zero_grad()  # node optimizer 
+            node.opt.zero_grad()  # node optimizer 
         self.opt_gen.zero_grad() # general optimizer
 
     def _update_hist(self, epoch, fit, gen, reg, verb=1):
@@ -262,7 +254,7 @@ class Licchavi():
     def _old(self, years):
         ''' increments age of nodes (during training) '''
         for node in self.nodes.values():
-            node[7] += years 
+            node.age += years 
 
     def _counters(self, c_gen, c_fit):
         ''' updates internal training counters '''
@@ -277,7 +269,7 @@ class Licchavi():
         ''' step for appropriate optimizer(s) '''
         if fit_step:  # updating local or global alternatively
             for node in self.nodes.values(): 
-                node[8].step() # node optimizer   
+                node.opt.step() # node optimizer   
         else:
             self.opt_gen.step()  
 
@@ -293,8 +285,8 @@ class Licchavi():
         limit = 0.1
         with torch.no_grad():
             for node in self.nodes.values():
-                if node[5] < limit: # node[5] = s
-                    node[5][0] = limit
+                if node.s < limit: # node.s = s
+                    node.s[0] = limit
 
     # ====================  TRAINING ================== 
 
@@ -334,17 +326,17 @@ class Licchavi():
                     #self._rectify_s()  # to prevent s from diverging (bruteforce)
                     fit_loss, gen_loss = 0, 0
                     for node in self.nodes.values():  
-                        fit_loss += node_local_loss(node[6],  # local model
-                                                    node[5],  # s
-                                                    node[0],  # id_batch1
-                                                    node[1],  # id_batch2
-                                                    node[2])  # r_batch
-                        g = models_dist(node[6],            # local model
+                        fit_loss += node_local_loss(node.model,  # local model
+                                                    node.s,  # s
+                                                    node.vid1,  # id_batch1
+                                                    node.vid2,  # id_batch2
+                                                    node.r)  # r_batch
+                        g = models_dist(node.model,            # local model
                                         self.general_model, # general model
                                         self.pow_gen,       # norm
-                                        node[4]             # mask
+                                        node.mask             # mask
                                         ) 
-                        gen_loss +=  node[9] * g  # node weight  * generalisation term
+                        gen_loss +=  node.w * g  # node weight  * generalisation term
                     fit_loss *= fit_scale
                     gen_loss *= gen_scale
                     loss = fit_loss + gen_loss 
@@ -353,12 +345,12 @@ class Licchavi():
                 else:        
                     gen_loss, reg_loss = 0, 0
                     for node in self.nodes.values():   
-                        g = models_dist(node[6],            # local model
+                        g = models_dist(node.model,            # local model
                                         self.general_model, # general model
                                         self.pow_gen,       # norm
-                                        node[4]             # mask
+                                        node.mask             # mask
                                         )
-                        gen_loss += node[9] * g  # node weight * generalis term
+                        gen_loss += node.w * g  # node weight * generalis term
                     reg_loss = model_norm(self.general_model, self.pow_reg) 
                     gen_loss *= gen_scale
                     reg_loss *= reg_scale        
