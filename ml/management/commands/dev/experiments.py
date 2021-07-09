@@ -21,8 +21,8 @@ TEST_DATA = [
                 [1, 100, 101, "reliability", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
-                [1, 100, 101, "reliability", 100, 0],
-                [1, 100, 101, "reliability", 100, 0],
+                [0, 100, 101, "reliability", 100, 0],
+                [0, 100, 101, "reliability", 100, 0],
                 
 
                 # [1, 100, 101, "reliability", 100, 0],
@@ -39,11 +39,12 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 
-TEST_DATA, _, _ = generate_data(10, 3, 4)
-print(TEST_DATA)
+ 
+
+# nb_vids, nb_users, vids_per_user
 
 NAME = ""
-EPOCHS = 200
+EPOCHS = 2
 TRAIN = True 
 RESUME = False
 
@@ -51,8 +52,9 @@ def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
         seedall(4)
+        fake_data, glob_fake, loc_fake = generate_data(5, 100, 5, dens=0.999)
         from ..ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(TEST_DATA, 
+        glob_scores, contributor_scores = ml_run(fake_data, 
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -63,8 +65,10 @@ def run_experiment(comparison_data):
     for c in glob_scores:
         if c[2]<-1:
             print(c)
-    disp_one_by_line(glob_scores[:100])
+    disp_one_by_line(glob_scores[:10])
+    # disp_one_by_line(GLOB[:10])
     disp_one_by_line(contributor_scores[:10])
+    # disp_one_by_line(LOC[0][:10])
     # check_one(6598, glob_scores, contributor_scores)
     # check_one(6865, glob_scores, contributor_scores)
     # check_one(7844, glob_scores, contributor_scores)
@@ -77,8 +81,6 @@ def licch_stats(licch):
     h = licch.history
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
-    # for id, node in licch.nodes.items():
-    #     print(id, len(node.vid1))
     with torch.no_grad():
         gen_s = licch.all_nodes("s")
         l_s = [s.item() for s in gen_s]
@@ -87,6 +89,7 @@ def licch_stats(licch):
                         PATH_PLOTS,
                         "s_params.png")
     plot_metrics([h], path=PATH_PLOTS)
+    # print("uncertainty", licch.uncert)
 
 def scores_stats(glob_scores):
     ''' gives statistics on global scores

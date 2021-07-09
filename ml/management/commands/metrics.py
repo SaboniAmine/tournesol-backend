@@ -1,7 +1,8 @@
+from torch.autograd.functional import hessian
 import torch
-import numpy as np
+from copy import deepcopy
 
-from .losses import round_loss
+from .losses import round_loss, loss_fit_gen
 
 """
 Metrics used for training monitoring in "licchavi.py"
@@ -25,3 +26,95 @@ def sp(l_grad1, l_grad2):
 def nb_params(model):
     ''' returns number of parameters of a model '''
     return sum(p.numel() for p in [model])
+
+def get_loc_models(nodes):
+    ''' Returns a generator of all local models 
+    
+    nodes (Node dictionnary): dictionnary of all nodes
+
+    Returns:
+        (generator): generator of nodes' models
+    '''
+    for node in nodes.values():
+        yield node.model
+
+def replace_coordinate(tens, score, idx):
+    """ Replaces one coordinate of the tensor
+
+    tens (float tensor): local model
+    score (scalar tensor): score to put in tens
+    idx (int): idx of score to replace
+
+    Returns:
+        (float tensor): same tensor as input but backward pointing to -score
+    """
+    size = len(tens)
+    left, _, right = torch.split(tens, [idx, 1, size - idx - 1]) 
+    new = torch.cat([left, score, right])
+    return new
+
+# to compute uncertainty
+def get_hessian_fun(nodes, general_model, fit_scale, gen_scale, pow_gen,
+                          id_node, vidx):
+    """ Gives loss in function of local model for hessian computation 
+    
+    nodes (Node dictionnary): dictionnary of all nodes
+    general_model (float tensor): general model
+    fit_scale (float): importance of the local loss
+    gen_scale float): importance of the generalisation loss
+    pow_gen (float, float): distance used for generalisation
+    id_node (int): id of user
+    vidx (int): index of video, ie index of parameter
+
+    Returns:
+        (scalar tensor -> float) function giving loss according to one parameter 
+    """
+    def get_loss(score):
+        """ Used to compute its second derivative to get uncertainty
+        
+        input (float scalar tensor): one score
+
+        Returns:
+            (float scalar tensor): partial loss
+        """
+
+        new_model = replace_coordinate(nodes[id_node].model, score, vidx)
+        nodes[id_node].model = new_model
+        fit, gen =  loss_fit_gen(nodes, general_model, fit_scale, 
+                                gen_scale, pow_gen)
+        return fit + gen
+    return get_loss
+
+def get_uncertainty(nodes, general_model, fit_scale, 
+                        gen_scale, pow_gen, vid_vidx):
+    """ Returns uncertainty for all local scores (list of list of int) 
+    
+    nodes (Node dictionnary): dictionnary of all nodes
+    general_model (float tensor): general model
+    fit_scale (float): importance of the local loss
+    gen_scale float): importance of the generalisation loss
+    pow_gen (float, float): distance used for generalisation
+    vid_vidx (dictionnary): {video ID: video index}
+
+    Returns:
+        (list of list of float): uncertainty for all local scores
+    """
+    l_uncert = []
+    for uid, node in nodes.items(): # for all nodes
+        local_uncerts = []
+        for vid in node.vids:  # for all videos of the node
+            vidx = vid_vidx[vid]  # video index
+            score = node.model[vidx:vidx+1].detach()
+            score = deepcopy(score)
+            fun = get_hessian_fun(nodes, general_model, fit_scale,
+                                gen_scale, pow_gen, uid, vidx)
+            deriv2 = hessian(fun, score).item()
+            uncert = deriv2**(-0.5)
+            local_uncerts.append(uncert)
+        l_uncert.append(local_uncerts)
+    return l_uncert
+
+
+
+
+

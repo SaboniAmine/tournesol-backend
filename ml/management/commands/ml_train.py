@@ -63,7 +63,7 @@ PATH = FOLDER_PATH + FILENAME
 os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
-EPOCHS = 1
+EPOCHS = 150
 CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
              "layman_friendly", "diversity_inclusion", "backfire_risk", 
              "better_habits", "entertaining_relaxing"]

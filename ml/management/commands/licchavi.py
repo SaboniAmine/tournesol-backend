@@ -4,7 +4,7 @@ from time import time
 
 from .losses import model_norm, round_loss, models_dist
 from .losses import node_local_loss, predict
-from .metrics import extract_grad, sp
+from .metrics import extract_grad, sp, get_uncertainty
 from .data_utility import expand_tens, one_hot_vids
 from .hyperparameters import get_defaults
 from .nodes import Node
@@ -370,6 +370,10 @@ class Licchavi():
 
         # ----------------- end of training -------------------------------  
         if verb>=0: print("training time :", round(time() - time_train, 2)) 
+        #self.uncert = get_uncertainty(    self.nodes, self.general_model, 
+                                        # fit_scale, gen_scale, self.pow_gen,
+                                        # self.vid_vidx)
+
         return self.history # self.train() returns lists of metrics
 
     # ------------ to check for problems --------------------------

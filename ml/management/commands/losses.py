@@ -92,7 +92,7 @@ def node_local_loss(model, s, a_batch, b_batch, r_batch):
     loss = 0 
     for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
         loss += fit_loss(s, ya, yb, r)
-    return loss + s_loss(s) 
+    return loss + s_loss(s) #FIXME split in 2 functions
 
 def models_dist(model1, model2, pow=(1,1), mask=None):  
     ''' distance between 2 models (l1 by default)
@@ -135,3 +135,67 @@ def round_loss(tens, dec=0):
         return round(tens, dec)
     else:
         return round(tens.item(), dec)
+
+# losses used in "licchavi.py"
+def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
+    """ Computes local and generalisation terms of loss
+    
+    """
+    fit_loss, gen_loss = 0, 0
+    for node in nodes.values():  
+        fit_loss += node_local_loss(node.model,  # local model
+                                    node.s,  # s
+                                    node.vid1,  # id_batch1
+                                    node.vid2,  # id_batch2
+                                    node.r)  # r_batch
+        g = models_dist(node.model,            # local model
+                        general_model, # general model
+                        pow_gen,       # norm
+                        node.mask      # mask
+                        ) 
+        gen_loss +=  node.w * g  # node weight  * generalisation term
+    fit_loss *= fit_scale
+    gen_loss *= gen_scale
+    return fit_loss, gen_loss
+
+def loss_gen_reg(nodes, general_model, gen_scale, reg_scale, pow_gen, pow_reg):
+    """ Computes generalisation and regularisation terms of loss
+    
+    """
+    gen_loss, reg_loss = 0, 0
+    for node in nodes.values():   
+        g = models_dist(node.model,    # local model
+                        general_model, # general model
+                        pow_gen,       # norm
+                        node.mask      # mask
+                        )
+        gen_loss += node.w * g  # node weight * generalis term
+    reg_loss = model_norm(general_model, pow_reg) 
+    gen_loss *= gen_scale
+    reg_loss *= reg_scale 
+    return gen_loss, reg_loss
+
+def loss_fit_gen_hess(nodes, models, general_model, 
+                        fit_scale, gen_scale, pow_gen):
+    """ Computes local and generalisation terms of loss, for hessian
+    
+
+    Returns:
+        (float scalar tensor): partial loss
+    """
+    fit_loss, gen_loss = 0, 0
+    for node, model in zip(nodes.values(), models):  
+        fit_loss += node_local_loss(model,  # local model
+                                    node.s,  # s
+                                    node.vid1,  # id_batch1
+                                    node.vid2,  # id_batch2
+                                    node.r)  # r_batch
+        g = models_dist(model,            # local model
+                        general_model, # general model
+                        pow_gen,       # norm
+                        node.mask             # mask
+                        ) 
+        gen_loss +=  node.w * g  # node weight  * generalisation term
+    fit_loss *= fit_scale
+    gen_loss *= gen_scale
+    return fit_loss + gen_loss
