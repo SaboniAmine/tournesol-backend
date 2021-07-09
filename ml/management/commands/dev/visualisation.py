@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 
 """
 Visualisation methods, mainly for testing and debugging
@@ -23,7 +24,7 @@ def seedall(s):
     ''' seeds all sources of randomness '''
     reproducible = (s >= 0)
     torch.manual_seed(s)
-    #random.seed(s)
+    random.seed(s)
     np.random.seed(s)
     torch.backends.cudnn.deterministic = reproducible
     torch.backends.cudnn.benchmark     = not reproducible

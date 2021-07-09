@@ -15,7 +15,7 @@ from .licchavi import get_licchavi
 from .handle_data import select_criteria, shape_data
 from .handle_data import distribute_data, distribute_data_from_save
 from .handle_data import format_out_loc, format_out_glob
-from .experiments import run_experiment, licch_stats, scores_stats
+from .dev.experiments import run_experiment, licch_stats, scores_stats
 
 """
 Machine Learning main python file
@@ -88,7 +88,7 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
 
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
-    resume: bool, resume previous processing
+    resume: bool, resume prevvideoious processing
     Returns :   
     - (tensor of all vIDS , tensor of global video scores)
     - (list of tensor of local vIDs , list of tensors of local video scores)

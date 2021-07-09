@@ -1,15 +1,16 @@
 from os import makedirs
 import torch
 
+from ..data_utility import save_to_json, load_from_json
 from .plots import plot_metrics, plot_density
-from .data_utility import save_to_json, load_from_json
 from .visualisation import seedall, check_one, disp_one_by_line
+from .fake_data import generate_data
 
 """
 Not used in production, for testing only
 Module called from "ml_train.py" only if env var TOURNESOL_DEV is True
 
-Used to perform some tests on ml algorithm (custom data, ...)
+Used to perform some tests on ml algorithm (custom data, plots, ...)
 """
 
 PATH_PLOTS = "ml/plots/"
@@ -17,28 +18,41 @@ makedirs(PATH_PLOTS, exist_ok=True)
 
 CRITERIAS = ["reliability"]
 TEST_DATA = [
-                [0, 100, 101, "reliability", 100, 0],
-                [0, 101, 110, "reliability", 0, 0],
-                [1, 100, 101, "importance", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
-                [1, 102, 103, "reliability", 70, 0],
-                [2, 104, 105, "reliability", 50, 0],
-                [3, 106, 107, "reliability", 30, 0],
-                [4, 108, 109, "reliability", 30, 0],
+                [1, 100, 101, "reliability", 100, 0],
+                [1, 100, 101, "reliability", 100, 0],
+                [1, 100, 101, "reliability", 100, 0],
+                [1, 100, 101, "reliability", 100, 0],
+                
+
+                # [1, 100, 101, "reliability", 100, 0],
+                # [2, 100, 101, "reliability", 100, 0],
+                # [3, 100, 101, "reliability", 100, 0],
+                # [4, 100, 101, "reliability", 100, 0],
+                # [1, 100, 101, "importance", 100, 0],
+                # [1, 100, 101, "reliability", 100, 0],
+                # [1, 102, 103, "reliability", 70, 0],
+                # [2, 104, 105, "reliability", 50, 0],
+                # [3, 106, 107, "reliability", 30, 0],
+                # [4, 108, 109, "reliability", 30, 0],
                 # [67, 200, 201, "reliability", 0, 0]
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
+
+TEST_DATA, _, _ = generate_data(10, 3, 4)
+print(TEST_DATA)
+
 NAME = ""
-EPOCHS = 1
+EPOCHS = 200
 TRAIN = True 
-RESUME = True
+RESUME = False
 
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
         seedall(4)
-        from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:], 
+        from ..ml_train import ml_run
+        glob_scores, contributor_scores = ml_run(TEST_DATA, 
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -46,12 +60,15 @@ def run_experiment(comparison_data):
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
         glob_scores, contributor_scores = load_from_json(NAME)
-    for c in contributor_scores:
-        if c[0]==6213:
+    for c in glob_scores:
+        if c[2]<-1:
             print(c)
-    disp_one_by_line(glob_scores[:10])
+    disp_one_by_line(glob_scores[:100])
     disp_one_by_line(contributor_scores[:10])
-    check_one(5534, glob_scores, contributor_scores)
+    # check_one(6598, glob_scores, contributor_scores)
+    # check_one(6865, glob_scores, contributor_scores)
+    # check_one(7844, glob_scores, contributor_scores)
+    # check_one(7928, glob_scores, contributor_scores)
     print("glob:", len(glob_scores), "local:",  len(contributor_scores))
 
 def licch_stats(licch):
@@ -60,6 +77,8 @@ def licch_stats(licch):
     h = licch.history
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
+    # for id, node in licch.nodes.items():
+    #     print(id, len(node.vid1))
     with torch.no_grad():
         gen_s = licch.all_nodes("s")
         l_s = [s.item() for s in gen_s]

@@ -6,9 +6,9 @@ from .losses import model_norm, round_loss, models_dist
 from .losses import node_local_loss, predict
 from .metrics import extract_grad, sp
 from .data_utility import expand_tens, one_hot_vids
-from .visualisation import disp_one_by_line
 from .hyperparameters import get_defaults
 from .nodes import Node
+from .dev.visualisation import disp_one_by_line
 
 """
 Machine Learning algorithm, used in "ml_train.py"
@@ -219,10 +219,11 @@ class Licchavi():
         print("var of s: ", round_loss(torch.var(tens), 2))
 
     # ---------- methods for training ------------
-    def _set_lr(self): # DOESNT UPDATE S LRs
+    def _set_lr(self):
         ''' sets learning rates of optimizers according to Licchavi settings '''
         for node in self.nodes.values(): 
             node.opt.param_groups[0]['lr'] = self.lr_node # node optimizer
+            #node.opt.param_groups[1]['lr'] = node.lr_s
         self.opt_gen.param_groups[0]['lr'] = self.lr_gen
 
     def _zero_opt(self):
