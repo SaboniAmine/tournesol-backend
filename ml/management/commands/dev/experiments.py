@@ -5,6 +5,7 @@ from ..data_utility import save_to_json, load_from_json
 from .plots import plot_metrics, plot_density
 from .visualisation import seedall, check_one, disp_one_by_line
 from .fake_data import generate_data
+from .tests import run_unittests
 
 """
 Not used in production, for testing only
@@ -51,10 +52,10 @@ RESUME = False
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
-        seedall(4)
-        fake_data, glob_fake, loc_fake = generate_data(5, 100, 5, dens=0.999)
-        print(fake_data)
         from ..ml_train import ml_run
+        seedall(4)
+        run_unittests()
+        fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
         glob_scores, contributor_scores = ml_run(fake_data, 
                                                     EPOCHS,
                                                     CRITERIAS, 

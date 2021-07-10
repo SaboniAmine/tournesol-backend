@@ -30,7 +30,7 @@ def fake_loc_scores(distribution, glob_scores, w):
     """
     all_idxs = range(len(glob_scores))
     b = 1/w # scale of laplace noise
-    l_nodes =[]
+    l_nodes = []
     for nb_vids in distribution: # for each node
         pick_idxs = random.sample(all_idxs, nb_vids) # videos rated by user
         noises = np.random.laplace(size=nb_vids, scale=b) # random noise

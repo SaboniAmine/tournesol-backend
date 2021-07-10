@@ -12,15 +12,28 @@ Main file is "ml_train.py"
 
 # to handle data 
 def rescale_rating(rating):
-    ''' rescales from 0-100 to [-1,1] float '''
+    ''' rescales from [0,100] to [-1,1] float '''
     return rating / 50 - 1
 
 def get_all_vids(arr):
-    ''' get all unique vIDs for one criteria (all users) '''
-    return np.unique(arr[:,1:3])
+    ''' get all unique vIDs for one criteria (all users) 
+    
+    arr (2D float array): 1 line is [userID, vID1, vID2, r]
+
+    Returns:
+        (float array): unique video IDs
+    '''
+    return np.unique(arr[:,1:3]) # columns 1 and 2 are what we want
 
 def get_mask(batch1, batch2):
-    ''' returns boolean tensor indicating which videos the user rated '''
+    ''' returns boolean tensor indicating which videos the user rated 
+
+    batch1 (2D bool tensor): 1 line is a one-hot encoded video index
+    batch2 (2D bool tensor): 1 line is a one-hot encoded video index
+
+    Returns:
+        (singleton of bool tensor): True for all indexes rated by the user
+    '''
     batch = batch1 + batch2
     to = batch.sum(axis=0, dtype=bool)
     return [to]
@@ -33,8 +46,8 @@ def sort_by_first(arr):
 def one_hot_vid(vid_vidx, vid):
     ''' One-hot inputs for neural network
     
-    vid_vidx: dictionnary of {vID: idx}
-    vid: vID
+    vid_vidx (dictionnary): dictionnary of {vID: idx}
+    vid (int): video ID
 
     Returns: 1D boolean tensor with 0s and 1 only for video index
     '''
@@ -45,8 +58,8 @@ def one_hot_vid(vid_vidx, vid):
 def one_hot_vids(vid_vidx, l_vid):
     ''' One-hot inputs for neural network, list to batch
     
-    vid_vidx: dictionnary of {vID: idx}
-    vid: list of vID
+    vid_vidx (int dictionnary): dictionnary of {vID: vidx}
+    vid (int list): list of vID
 
     Returns: 2D bollean tensor with one line being 0s and 1 only for video index
     '''
@@ -56,7 +69,13 @@ def one_hot_vids(vid_vidx, l_vid):
     return batch
 
 def reverse_idxs(vids):
-    ''' Returns dictionnary of {vid: idx} '''
+    ''' Returns dictionnary of {vid: vidx} 
+    
+    vids ():
+
+    Returns:
+        (int:int dictionnary): dictionnary of {videoID: video index}
+    '''
     vid_vidx = {}
     for idx, vid in enumerate(vids):
         vid_vidx[vid] = idx
