@@ -7,5 +7,6 @@ bandit==1.7.0
 
 # Unit tests tools
 pytest==6.2.4
+pytest-django==4.4.0
 pytest-mock==3.6.1
 faker==8.8.2
