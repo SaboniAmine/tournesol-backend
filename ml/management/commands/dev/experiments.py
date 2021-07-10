@@ -53,6 +53,7 @@ def run_experiment(comparison_data):
     if TRAIN:
         seedall(4)
         fake_data, glob_fake, loc_fake = generate_data(5, 100, 5, dens=0.999)
+        print(fake_data)
         from ..ml_train import ml_run
         glob_scores, contributor_scores = ml_run(fake_data, 
                                                     EPOCHS,

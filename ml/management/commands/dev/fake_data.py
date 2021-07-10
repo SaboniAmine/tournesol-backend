@@ -69,6 +69,10 @@ def get_rd_rate(a, b):
     my_cv = my_pdf(a=-1, b=1, name='my_pdf')
     return my_cv.rvs()
 
+def unscale_rating(r):
+    """ Converts [-1,1] to [0, 100] """
+    return (r + 1) * 50
+
 def fake_comparisons(l_nodes, dens=0.5, crit="reliability"):
     """ 
 
@@ -91,7 +95,8 @@ def fake_comparisons(l_nodes, dens=0.5, crit="reliability"):
             pick_idxs = random.sample(following_videos, nb_comp)
             for vidx2 in pick_idxs:
                 r = get_rd_rate(video[1], node[vidx2][1]) # get random r
-                comp = [uid, video[0], node[vidx2][0], crit, r, 0]
+                rate = unscale_rating(r)  # put to [0, 100]
+                comp = [uid, video[0], node[vidx2][0], crit, rate, 0]
                 all_comps.append(comp)
     return all_comps
 
