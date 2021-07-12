@@ -14,9 +14,9 @@ def get_defaults():
                 "w": 1,   # float >= 0, harmonisation parameter
 
                 # learning hyperparameters
-                "lr_gen": 0.001,     # float > 0, learning rate of global model
-                "lr_node": 0.01,    # float > 0, learning rate of local models
-                "lr_s" : 0.0001,   # float > 0, learning rate of s parameters
+                "lr_gen": 0.01,     # float > 0, learning rate of global model
+                "lr_node": 0.1,    # float > 0, learning rate of local models
+                "lr_s" : 0.001,   # float > 0, learning rate of s parameters
                 "gen_freq": 1, # int >= 1, number of global steps 
                                #                 for 1 local step
                 

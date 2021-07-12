@@ -3,7 +3,7 @@ from copy import deepcopy
 from time import time
 
 from .losses import model_norm, round_loss, models_dist
-from .losses import node_local_loss, predict
+from .losses import predict, loss_fit_gen, loss_gen_reg
 from .metrics import extract_grad, sp, get_uncertainty
 from .data_utility import expand_tens, one_hot_vids
 from .hyperparameters import get_defaults
@@ -301,10 +301,9 @@ class Licchavi():
         loss, fit_loss, gen_loss, reg_loss = 0, 0, 0, 0
         c_fit, c_gen = 0, 0
         
-        const = 10  # just for visualisation (remove later)
-        fit_scale = const 
-        gen_scale = const  # node weights are used in addition
-        reg_scale = const * self.w0
+        fit_scale = 1 
+        gen_scale = 1  # node weights are used in addition
+        reg_scale = self.w0
 
         reg_loss = reg_scale * model_norm(self.general_model, self.pow_reg)  
 
@@ -324,37 +323,23 @@ class Licchavi():
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
-                    #self._rectify_s()  # to prevent s from diverging (bruteforce)
-                    fit_loss, gen_loss = 0, 0
-                    for node in self.nodes.values():  
-                        fit_loss += node_local_loss(node.model,  # local model
-                                                    node.s,  # s
-                                                    node.vid1,  # id_batch1
-                                                    node.vid2,  # id_batch2
-                                                    node.r)  # r_batch
-                        g = models_dist(node.model,            # local model
-                                        self.general_model, # general model
-                                        self.pow_gen,       # norm
-                                        node.mask             # mask
-                                        ) 
-                        gen_loss +=  node.w * g  # node weight  * generalisation term
-                    fit_loss *= fit_scale
-                    gen_loss *= gen_scale
-                    loss = fit_loss + gen_loss 
+                    fit_loss, gen_loss = loss_fit_gen(  self.nodes,
+                                                        self.general_model,
+                                                        fit_scale,
+                                                        gen_scale,
+                                                        self.pow_gen
+                                                        )
+                    loss = fit_loss + gen_loss
                           
                 # only last 2 terms of loss updated 
                 else:        
-                    gen_loss, reg_loss = 0, 0
-                    for node in self.nodes.values():   
-                        g = models_dist(node.model,            # local model
-                                        self.general_model, # general model
-                                        self.pow_gen,       # norm
-                                        node.mask             # mask
-                                        )
-                        gen_loss += node.w * g  # node weight * generalis term
-                    reg_loss = model_norm(self.general_model, self.pow_reg) 
-                    gen_loss *= gen_scale
-                    reg_loss *= reg_scale        
+                    gen_loss, reg_loss = loss_gen_reg(  self.nodes,
+                                                        self.general_model,
+                                                        gen_scale,
+                                                        reg_scale,
+                                                        self.pow_gen,
+                                                        self.pow_reg
+                                                        )
                     loss = gen_loss + reg_loss
 
                 if verb >= 2:

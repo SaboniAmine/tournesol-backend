@@ -107,7 +107,7 @@ def models_dist(model1, model2, pow=(1,1), mask=None):
         float: distance between the 2 models
     '''
     q, p = pow
-    if mask is None:
+    if mask is None: #FIXME dont use mask if None
         mask = [torch.ones_like(param) for param in [model1]]
     dist = sum(
                 (((theta - rho) * coef)**q).abs().sum() for theta, rho, coef 
@@ -140,15 +140,25 @@ def round_loss(tens, dec=0):
 def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
     """ Computes local and generalisation terms of loss
     
+    Args:
+        nodes (dictionnary): {node ID: Node()}
+        general_model (float tensor): general score model
+        fit_scale (float): local loss multiplier
+        gen_scale (float): generalisation loss multiplier
+        pow_gen (float, float): parameters of generalisation distance
+
+    Returns:
+        (float tensor): sum of local terms of loss
+        (float tensor): generalisation term of loss
     """
     fit_loss, gen_loss = 0, 0
     for node in nodes.values():  
-        fit_loss += node_local_loss(node.model,  # local model
-                                    node.s,  # s
+        fit_loss += node_local_loss(node.model, # local model
+                                    node.s,     # s
                                     node.vid1,  # id_batch1
                                     node.vid2,  # id_batch2
-                                    node.r)  # r_batch
-        g = models_dist(node.model,            # local model
+                                    node.r)     # r_batch
+        g = models_dist(node.model,    # local model
                         general_model, # general model
                         pow_gen,       # norm
                         node.mask      # mask
@@ -161,6 +171,17 @@ def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
 def loss_gen_reg(nodes, general_model, gen_scale, reg_scale, pow_gen, pow_reg):
     """ Computes generalisation and regularisation terms of loss
     
+    Args:
+        nodes (dictionnary): {node ID: Node()}
+        general_model (float tensor): general score model
+        gen_scale (float): generalisation loss multiplier
+        reg_scale (float): regularisation loss multiplier
+        pow_gen (float, float): parameters of generalisation distance
+        pow_reg (float, float): parameters of regularisation norm
+
+    Returns:
+        (float tensor): generalisation term of loss
+        (float tensor): regularisation loss (of general model)
     """
     gen_loss, reg_loss = 0, 0
     for node in nodes.values():   
@@ -175,27 +196,3 @@ def loss_gen_reg(nodes, general_model, gen_scale, reg_scale, pow_gen, pow_reg):
     reg_loss *= reg_scale 
     return gen_loss, reg_loss
 
-def loss_fit_gen_hess(nodes, models, general_model, 
-                        fit_scale, gen_scale, pow_gen):
-    """ Computes local and generalisation terms of loss, for hessian
-    
-
-    Returns:
-        (float scalar tensor): partial loss
-    """
-    fit_loss, gen_loss = 0, 0
-    for node, model in zip(nodes.values(), models):  
-        fit_loss += node_local_loss(model,  # local model
-                                    node.s,  # s
-                                    node.vid1,  # id_batch1
-                                    node.vid2,  # id_batch2
-                                    node.r)  # r_batch
-        g = models_dist(model,            # local model
-                        general_model, # general model
-                        pow_gen,       # norm
-                        node.mask             # mask
-                        ) 
-        gen_loss +=  node.w * g  # node weight  * generalisation term
-    fit_loss *= fit_scale
-    gen_loss *= gen_scale
-    return fit_loss + gen_loss
