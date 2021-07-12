@@ -55,8 +55,8 @@ def run_experiment(comparison_data):
         from ..ml_train import ml_run
         seedall(4)
         run_unittests()
-        fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
-        glob_scores, contributor_scores = ml_run(fake_data, 
+        #fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
+        glob_scores, contributor_scores = ml_run(comparison_data[:10000],
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -64,8 +64,8 @@ def run_experiment(comparison_data):
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
         glob_scores, contributor_scores = load_from_json(NAME)
-    for c in glob_scores:
-        if c[2]<-1:
+    for c in comparison_data:
+        if c[3]=="largely_recommended":
             print(c)
     disp_one_by_line(glob_scores[:10])
     # disp_one_by_line(GLOB[:10])

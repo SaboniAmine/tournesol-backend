@@ -49,7 +49,8 @@ def one_hot_vid(vid_vidx, vid):
     vid_vidx (dictionnary): dictionnary of {vID: idx}
     vid (int): video ID
 
-    Returns: 1D boolean tensor with 0s and 1 only for video index
+    Returns: 
+        (1D boolean tensor): one-hot encoded video index
     '''
     tens = torch.zeros(len(vid_vidx), dtype=bool)
     tens[vid_vidx[vid]] = True
@@ -61,7 +62,8 @@ def one_hot_vids(vid_vidx, l_vid):
     vid_vidx (int dictionnary): dictionnary of {vID: vidx}
     vid (int list): list of vID
 
-    Returns: 2D bollean tensor with one line being 0s and 1 only for video index
+    Returns: 
+        (2D boolean tensor): one line is one-hot encoded video index
     '''
     batch = torch.zeros(len(l_vid), len(vid_vidx), dtype=bool)
     for idx, vid in enumerate(l_vid):
@@ -71,7 +73,7 @@ def one_hot_vids(vid_vidx, l_vid):
 def reverse_idxs(vids):
     ''' Returns dictionnary of {vid: vidx} 
     
-    vids ():
+    vids (int iterable): unique video IDs
 
     Returns:
         (int:int dictionnary): dictionnary of {videoID: video index}
@@ -133,6 +135,7 @@ def save_to_pickle(obj, name="pickle"):
         pickle.dump(obj, filehandler)
 
 def load_from_pickle(name="pickle"):
+    """ load python object from pickle file """
     filename = '{}.p'.format(name)
     with open(filename, 'rb') as filehandler:
         obj = pickle.load(filehandler)

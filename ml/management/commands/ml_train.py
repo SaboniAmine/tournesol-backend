@@ -66,7 +66,7 @@ RESUME = False # wether to resume training or not
 EPOCHS = 150
 CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
              "layman_friendly", "diversity_inclusion", "backfire_risk", 
-             "better_habits", "entertaining_relaxing"]
+             "better_habits", "entertaining_relaxing", "largely_recommended"]
 
 def fetch_data():
     """ Fetches the data from the Comparisons model

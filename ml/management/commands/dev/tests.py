@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.stats.stats import _shape_with_dropped_axis
 import torch
 
 """
@@ -35,14 +34,29 @@ def run_unittests():
     assert mask[0].shape == torch.Size([4]), "get_mask"
 
     # sort_by_first
-    from ..data_utility import sort_by_first
+    from ..data_utility import sort_by_first, reverse_idxs
     arr = np.reshape(np.array(range(2 * size, 0, -1)), (size, 2))
     sorted = sort_by_first(arr)
     assert (sorted == sort_by_first(sorted)).all()
+    assert isinstance(sorted, np.ndarray)
 
-
-
+    # reverse_idxs
+    size = 20
+    vids = np.arange(0, size, 2)
+    vid_vidx = reverse_idxs(vids) # {vid: vidx} dic
+    vids2 = np.zeros(size//2)
+    for vid in vids:
+        vids2[vid_vidx[vid]] = vid
+    print(vids, vids2)
+    assert (vids2 == vids).all()
+    assert isinstance(vid_vidx, dict) 
     #assert False, "ALL GOOD"
+
+    # expand_tens
+    from ..data_utility import expand_dic, expand_tens
+    
+
+
 
 
 
