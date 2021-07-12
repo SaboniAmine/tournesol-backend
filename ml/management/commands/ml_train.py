@@ -6,16 +6,16 @@ from django.core.management.base import BaseCommand, CommandError
 from numpy.core.numeric import full
 
 from tournesol.models import Comparison
-from settings.settings import VIDEO_FIELDS
+from settings.settings import CRITERIAS
 
 import os
 import logging
 
-from .licchavi import get_licchavi
-from .handle_data import select_criteria, shape_data
-from .handle_data import distribute_data, distribute_data_from_save
-from .handle_data import format_out_loc, format_out_glob
-from .dev.experiments import run_experiment, licch_stats, scores_stats
+from ml.licchavi import get_licchavi
+from ml.handle_data import select_criteria, shape_data
+from ml.handle_data import distribute_data, distribute_data_from_save
+from ml.handle_data import format_out_loc, format_out_glob
+from ml.experiments import run_experiment, licch_stats
 
 """
 Machine Learning main python file
@@ -64,9 +64,6 @@ os.makedirs(FOLDER_PATH, exist_ok=True)
 RESUME = False # wether to resume training or not
 
 EPOCHS = 150
-CRITERIAS = ["reliability", "importance", "engaging", "pedagogy", 
-             "layman_friendly", "diversity_inclusion", "backfire_risk", 
-             "better_habits", "entertaining_relaxing", "largely_recommended"]
 
 def fetch_data():
     """ Fetches the data from the Comparisons model
@@ -88,7 +85,7 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
 
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
-    resume: bool, resume prevvideoious processing
+    resume: bool, resume previous processing
     Returns :   
     - (tensor of all vIDS , tensor of global video scores)
     - (list of tensor of local vIDs , list of tensors of local video scores)
@@ -128,16 +125,16 @@ def ml_run(comparison_data, epochs, criterias, resume, verb=2):
         score: float, uncertainty: float]
     """ # FIXME: not better to regroup contributors in same list or smthg ?
     glob_scores, loc_scores = [], []
-    for crit in criterias:
-        logging.info("PROCESSING " + crit)
+    for criteria in criterias:
+        logging.info("PROCESSING " + criteria)
         glob, loc, users_ids = shape_train_predict( comparison_data, 
-                                                    crit, 
+                                                    criteria, 
                                                     epochs,
                                                     resume, 
                                                     verb) 
         # putting in required shape for output
-        out_glob = format_out_glob(glob, crit) 
-        out_loc = format_out_loc(loc, users_ids, crit) 
+        out_glob = format_out_glob(glob, criteria) 
+        out_loc = format_out_loc(loc, users_ids, criteria) 
         glob_scores += out_glob
         loc_scores += out_loc
     return glob_scores, loc_scores
@@ -166,7 +163,7 @@ def save_data(video_scores, contributor_rating_scores):
     }
     ratings_to_create = set(
         (contributor_id, video_id)
-        for contributor_id, video_id, criteria_name, score, uncertainty 
+        for contributor_id, video_id, _, _, _
         in contributor_rating_scores
         if (contributor_id, video_id) not in rating_ids
     )

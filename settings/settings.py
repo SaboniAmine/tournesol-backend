@@ -23,7 +23,7 @@ server_settings = {}
 SETTINGS_FILE = 'SETTINGS_FILE' in os.environ and os.environ['SETTINGS_FILE'] or '/etc/django/settings-tournesol.yaml'
 try:
     with open(SETTINGS_FILE, 'r') as f:
-        server_settings = yaml.load(f, Loader=yaml.FullLoader)
+        server_settings = yaml.full_load(f)
 except FileNotFoundError:
     print('No local settings.')
     pass
@@ -37,12 +37,15 @@ SECRET_KEY = 'SECRET_KEY' in server_settings and server_settings['SECRET_KEY'] o
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = 'DEBUG' in server_settings and server_settings['DEBUG'] or False
 
-ALLOWED_HOSTS = 'ALLOWED_HOSTS' in server_settings and server_settings['ALLOWED_HOSTS'] or ['0.0.0.0', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = 'ALLOWED_HOSTS' in server_settings and server_settings['ALLOWED_HOSTS'] or ['127.0.0.1', 'localhost']
 
 STATIC_URL = '/static/'
-STATIC_ROOT = 'STATIC_ROOT' in server_settings and server_settings['STATIC_ROOT'] or '/tmp/static/'
-MEDIA_ROOT = 'MEDIA_ROOT' in server_settings and server_settings['MEDIA_ROOT'] or '/tmp/media/'
 MEDIA_URL = '/media/'
+
+# It is considered quite unsafe to use the /tmp directory, so we might as well use a dedicated root folder in HOME
+base_folder = f"{os.environ.get('HOME')}/.tournesol"
+STATIC_ROOT = 'STATIC_ROOT' in server_settings and server_settings['STATIC_ROOT'] or f"{base_folder}{STATIC_URL}"
+MEDIA_ROOT = 'MEDIA_ROOT' in server_settings and server_settings['MEDIA_ROOT'] or f"{base_folder}{MEDIA_URL}"
 
 MAIN_URL = 'MAIN_URL' in server_settings and server_settings['MAIN_URL'] or 'http://localhost:8000/'
 
@@ -58,9 +61,10 @@ INSTALLED_APPS = [
     'django_prometheus',
     'core',
     'tournesol',
+    'ml',
     'oauth2_provider',
     'rest_framework',
-    'ml',
+    'drf_spectacular'
 ]
 
 # Modèle utilisateur utilisé par Django (1.5+)
@@ -186,7 +190,6 @@ REST_FRAMEWORK = {
     ),
 
     # custom exception handling
-    'EXCEPTION_HANDLER': 'backend.api_v2.exception.handler',
 
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -203,7 +206,7 @@ REST_FRAMEWORK = {
 # 0 means left video is best, 100 means right video is best
 MAX_VALUE = 100.
 
-VIDEO_FIELDS_DICT = OrderedDict([
+CRITERIAS_DICT = OrderedDict([
     ('largely_recommended', 'Should be largely recommended'),
     ('reliability', "Reliable and not misleading"),
     ('importance', "Important and actionable"),
@@ -216,7 +219,7 @@ VIDEO_FIELDS_DICT = OrderedDict([
     ('entertaining_relaxing', 'Entertaining and relaxing'),
 ])
 
-VIDEO_FIELDS = list(VIDEO_FIELDS_DICT.keys())
+CRITERIAS = list(CRITERIAS_DICT.keys())
 
 # maximal weight to assign to a rating for a particular feature, see #41
 MAX_FEATURE_WEIGHT = 8

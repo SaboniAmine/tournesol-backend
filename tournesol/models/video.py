@@ -17,7 +17,7 @@ from core.models import User
 from core.utils.models import (WithFeatures, WithDynamicFields, WithEmbedding, ComputedJsonField, query_or, query_and, EnumList)
 from core.utils.constants import youtubeVideoIdRegex,ts_constants
 from tournesol.utils import VideoSearchEngine
-from settings.settings import VIDEO_FIELDS, VIDEO_FIELDS_DICT, MAX_VALUE, MAX_FEATURE_WEIGHT
+from settings.settings import CRITERIAS, CRITERIAS_DICT, MAX_VALUE, MAX_FEATURE_WEIGHT
 
 
 class Video(models.Model, WithFeatures, WithEmbedding):
@@ -134,7 +134,7 @@ class Video(models.Model, WithFeatures, WithEmbedding):
     )
 
     # COMPUTED properties implementation
-
+    # TODO create _annotate_is_certified function
     def get_certified_top_raters(self, add_user__username=None):
         """Get certified raters for this video, sorted by number of comparisons."""
 
@@ -143,19 +143,19 @@ class Video(models.Model, WithFeatures, WithEmbedding):
         if self.id is None:
             return User.objects.none()
 
-        filter_this_video = Q(user__userpreferences__comparison__video_1=self) |\
-            Q(user__userpreferences__comparison__video_2=self)
+        filter_this_video = Q(comparisons__video_1=self) |\
+            Q(comparisons__video_2=self)
 
         qs = User.objects.filter(filter_this_video)
-        qs = User._annotate_is_certified(qs)
-        filter_query = Q(_is_certified=True)
-        if add_user__username:
-            filter_query = filter_query | Q(user__username=add_user__username)
-        qs = qs.filter(filter_query)
-        qs = qs.annotate(_n_comparisons=Count('user__userpreferences__comparison',
-                                          filter_this_video))
+        # qs = User._annotate_is_certified(qs)
+        # filter_query = Q(_is_certified=True)
+        # if add_user__username:
+        #     filter_query = filter_query | Q(user__username=add_user__username)
+        # qs = qs.filter(filter_query)
+        # qs = qs.annotate(_n_comparisons=Count('user__userpreferences__comparison',
+        #                                   filter_this_video))
         qs = qs.distinct()
-        qs = qs.order_by('-_n_comparisons')
+        # qs = qs.order_by('-_n_comparisons')
         return qs
 
     # public rating and a public contributor
@@ -216,18 +216,20 @@ class Video(models.Model, WithFeatures, WithEmbedding):
 
     def get_rating_n_ratings(self, user=None):
         """Number of associated ratings."""
-        return self.ratings(user=user).count()
+        if user:
+            return Comparison.objects.filter(Q(video_1=self) | Q(video_2=self)).filter(user=user).count()
+        return Comparison.objects.filter(Q(video_1=self) | Q(video_2=self)).count()
 
     def get_rating_n_contributors(self):
         """Number of contributors in ratings."""
-        return self.ratings().values('user').distinct().count()
+        return Comparison.objects.filter(Q(video_1=self) | Q(video_2=self)).order_by("user").distinct("user").count()
 
     # /COMPUTED properties implementation
 
     def get_pareto_optimal(self):
         """Compute pareto-optimality in sql. Runs in O(n^2) where n=num videos."""
-        f1 = query_and([Q(**{f + "__gte": getattr(self, f)}) for f in VIDEO_FIELDS])
-        f2 = query_or([Q(**{f + "__gt": getattr(self, f)}) for f in VIDEO_FIELDS])
+        f1 = query_and([Q(**{f + "__gte": getattr(self, f)}) for f in CRITERIAS])
+        f2 = query_or([Q(**{f + "__gt": getattr(self, f)}) for f in CRITERIAS])
 
         qs = Video.objects.filter(f1).filter(f2)
         return qs.count() == 0
@@ -281,7 +283,7 @@ class Video(models.Model, WithFeatures, WithEmbedding):
         scores = VideoSearchEngine.score(
             self.short_text, self.features_as_vector)
 
-        for k, v in zip(VIDEO_FIELDS, self.features_as_vector):
+        for k, v in zip(CRITERIAS, self.features_as_vector):
             scores[k] = v
 
         return scores
@@ -305,27 +307,27 @@ class Video(models.Model, WithFeatures, WithEmbedding):
     def tournesol_score(self):
         # computed by a query
         return 0.0
-
-    def ratings(self, user=None, only_certified=True):
-        """All associated certified ratings."""
-        f = Q(video_1=self) | Q(video_2=self)
-        if user is not None:
-            f = f & Q(user=user)
-        qs = Comparison.objects.filter(f)
-        qs = User._annotate_is_certified(
-            qs, prefix="user__user__")
-        if only_certified:
-            qs = qs.filter(_is_certified=True)
-        return qs
+    # TODO create _annotate_is_certified function
+    # def ratings(self, user=None, only_certified=True):
+    #     """All associated certified ratings."""
+    #     f = Q(video_1=self) | Q(video_2=self)
+    #     if user is not None:
+    #         f = f & Q(user=user)
+    #     qs = Comparison.objects.filter(f)
+    #     qs = User._annotate_is_certified(
+    #         qs, prefix="user__user__")
+    #     if only_certified:
+    #         qs = qs.filter(_is_certified=True)
+    #     return qs
 
     @staticmethod
     def recompute_quantiles():
         """Set {f}_quantile attribute for videos."""
-        quantiles_by_feature_by_id = {f: {} for f in VIDEO_FIELDS}
+        quantiles_by_feature_by_id = {f: {} for f in CRITERIAS}
 
         # go over all features
         # logging.warning("Computing quantiles...")
-        for f in tqdm(VIDEO_FIELDS):
+        for f in tqdm(CRITERIAS):
             # order by feature (descenting, because using the top quantile)
             qs = Video.objects.filter(**{f + "__isnull": False}).order_by('-' + f)
             quantiles_f = np.linspace(0.0, 1.0, len(qs))
@@ -336,12 +338,12 @@ class Video(models.Model, WithFeatures, WithEmbedding):
         video_objects = []
         # TODO: use batched updates with bulk_update
         for v in tqdm(Video.objects.all()):
-            for f in VIDEO_FIELDS:
+            for f in CRITERIAS:
                 setattr(v, f + "_quantile", quantiles_by_feature_by_id[f].get(v.id, None))
             video_objects.append(v)
 
         Video.objects.bulk_update(video_objects, batch_size=200,
-                                  fields=[f + "_quantile" for f in VIDEO_FIELDS])
+                                  fields=[f + "_quantile" for f in CRITERIAS])
 
     @staticmethod
     def recompute_pareto():
@@ -398,12 +400,12 @@ class VideoCriteriaScore(models.Model):
         db_index=True,
     )
     score = models.FloatField(
-        default=0, 
-        blank=False, 
+        default=0,
+        blank=False,
         help_text="Score of the given criteria",
     )
     uncertainty = models.FloatField(
-        default=0, 
+        default=0,
         blank=False,
         help_text="Uncertainty about the video's score for the given criteria",
     )
@@ -424,7 +426,7 @@ class VideoCriteriaScore(models.Model):
 
     def __str__(self):
         return f"{self.video}/{self.criteria}/{self.score}"
-    
+
 
 class VideoRateLater(models.Model):
     """List of videos that a person wants to rate later."""
@@ -482,12 +484,12 @@ class ContributorRatingCriteriaScore(models.Model):
         db_index=True,
     )
     score = models.FloatField(
-        default=0, 
-        blank=False, 
+        default=0,
+        blank=False,
         help_text="Score for the given criteria",
     )
     uncertainty = models.FloatField(
-        default=0, 
+        default=0,
         blank=False,
         help_text="Uncertainty about the video's score for the given criteria",
     )
@@ -547,16 +549,17 @@ class Comparison(models.Model, WithFeatures):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
+        related_name="comparisons",
         help_text="Contributor (user) who left the rating")
     video_1 = models.ForeignKey(
         Video,
         on_delete=models.CASCADE,
-        related_name='%(class)s_video_1',
+        related_name='comparisons_video_1',
         help_text="Left video to compare")
     video_2 = models.ForeignKey(
         Video,
         on_delete=models.CASCADE,
-        related_name='%(class)s_video_2',
+        related_name='comparisons_video_2',
         help_text="Right video to compare")
     duration_ms = models.FloatField(
         null=True,
@@ -661,7 +664,7 @@ class Comparison(models.Model, WithFeatures):
     def save(self, *args, **kwargs):
         """Save the object data."""
         if not kwargs.pop('ignore_lastedit', False):
-            self.datetime_lastedit = timezone.make_aware(timezone.now())
+            self.datetime_lastedit = timezone.now()
         if self.pk is None:
             kwargs['force_insert'] = True
         return super().save(*args, **kwargs)
@@ -688,14 +691,14 @@ class ComparisonCriteriaScore(models.Model):
     # TODO: currently scores range from [0, 100], update them to range from [-10, 10]
     # and add validation
     score = models.FloatField(
-        default=0, 
-        blank=False, 
+        default=0,
+        blank=False,
         help_text="Score for the given comparison",
     )
     # TODO: ask Lê if weights should be in a certain range (maybe always > 0)
     # and add validation if required
     weight = models.FloatField(
-        default=0, 
+        default=0,
         blank=False,
         help_text="Weight of the comparison",
     )
@@ -739,14 +742,14 @@ class ComparisonSliderChanges(models.Model, WithFeatures, WithDynamicFields):
     @staticmethod
     def _create_fields():
         """Adding score fields."""
-        for field in VIDEO_FIELDS:
+        for field in CRITERIAS:
             ComparisonSliderChanges.add_to_class(
                 field,
                 models.FloatField(
                     blank=True,
                     null=True,
                     default=None,
-                    help_text=VIDEO_FIELDS_DICT[field],
+                    help_text=CRITERIAS_DICT[field],
                     validators=[
                         MinValueValidator(0.0),
                         MaxValueValidator(MAX_VALUE)]))
