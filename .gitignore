@@ -13,3 +13,5 @@ venv/
 .python-version
 .vscode
 ml/plots
+settings-tournesol.yaml
+pytest.ini

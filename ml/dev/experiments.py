@@ -5,7 +5,6 @@ from ..data_utility import save_to_json, load_from_json
 from .plots import plot_metrics, plot_density
 from .visualisation import seedall, check_one, disp_one_by_line
 from .fake_data import generate_data
-from .ml_tests import run_unittests
 
 """
 Not used in production, for testing only
@@ -54,7 +53,6 @@ def run_experiment(comparison_data):
     if TRAIN:
         from ..management.commands.ml_train import ml_run
         seedall(4)
-        run_unittests()
         #fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
         glob_scores, contributor_scores = ml_run(comparison_data[:10000],
                                                     EPOCHS,
@@ -64,9 +62,9 @@ def run_experiment(comparison_data):
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
         glob_scores, contributor_scores = load_from_json(NAME)
-    for c in comparison_data:
-        if c[3]=="largely_recommended":
-            print(c)
+    # for c in comparison_data:
+    #     if c[3]=="largely_recommended":
+    #         print(c)
     disp_one_by_line(glob_scores[:10])
     # disp_one_by_line(GLOB[:10])
     disp_one_by_line(contributor_scores[:10])
