@@ -4,7 +4,7 @@ from time import time
 
 from .losses import model_norm, round_loss, models_dist
 from .losses import predict, loss_fit_gen, loss_gen_reg
-from .metrics import extract_grad, sp, get_uncertainty
+from .metrics import extract_grad, scalar_product, get_uncertainty
 from .data_utility import expand_tens, one_hot_vids
 from .hyperparameters import get_defaults
 from .nodes import Node
@@ -244,12 +244,12 @@ class Licchavi():
         self.history[4].append(round_loss(norm, 1))
         grad_gen = extract_grad(self.general_model)
         if epoch > 1: # no previous model for first epoch
-            scal_grad = sp(self.last_grad, grad_gen)
+            scal_grad = scalar_product(self.last_grad, grad_gen)
             self.history[5].append(scal_grad)
         else:
             self.history[5].append(0) # default value for first epoch
         self.last_grad = deepcopy(extract_grad(self.general_model)) 
-        grad_norm = sp(grad_gen, grad_gen)  # use sqrt ?
+        grad_norm = scalar_product(grad_gen, grad_gen)  #FIXME use sqrt ?
         self.history[6].append(grad_norm)
 
     def _old(self, years):

@@ -7,6 +7,7 @@ from ml.data_utility import sort_by_first, reverse_idxs
 from ml.data_utility import expand_dic, expand_tens
 from ml.handle_data import select_criteria, shape_data, distribute_data
 from ml.losses import fbbt, hfbbt, fit_loss, s_loss
+from ml.metrics import extract_grad, scalar_product
 
 from ml.dev.fake_data import generate_data
 from ml.core import ml_run
@@ -156,6 +157,34 @@ def test_s_loss():
         s = torch.tensor(ss)
         output = s_loss(s).item()
         assert abs(output - res) <= 0.001
+
+def test_models_dist():
+    pass #TODO
+
+def test_model_norm():
+    pass #TODO
+
+# --------- licchavi.py ------------
+def test_get_model():
+    pass #TODO
+
+def test_get_licchavi():
+    pass #TODO test hyperparameters for instance
+
+# -------- metrics.py --------------
+def test_extract_grad():
+    model = torch.ones(4, requires_grad=True)
+    loss = model.sum() * 2
+    loss.backward()
+    for a, b in zip(extract_grad(model)[0], torch.ones(4) * 2):
+        assert a == b
+
+def test_scalar_product():
+    l_grad1 = [ torch.ones(2), torch.ones(3)]
+    l_grad2 = [ torch.zeros(2), torch.ones(3)]
+    l_grad1[1][1] = 7
+    output = scalar_product(l_grad1, l_grad2)
+    assert output == 9
 
 # ============= wider tests =============
 

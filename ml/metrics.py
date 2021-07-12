@@ -12,12 +12,25 @@ Main file "ml_train.py"
 
 # metrics on models
 def extract_grad(model):
-    ''' returns list of gradients of a model '''
+    ''' returns list of gradients of a model 
+    
+    model (float tensor): torch tensor with gradients
+
+    Returns:
+        (float tensor list): list of gradients of the model
+    '''
     l_grad =  [p.grad for p in [model]]
     return l_grad
 
-def sp(l_grad1, l_grad2):
-    ''' scalar product of 2 lists of gradients '''
+def scalar_product(l_grad1, l_grad2):
+    ''' scalar product of 2 lists of gradients 
+    
+    l_grad1 (float tensor list): list of gradients of a model
+    l_grad2 (float tensor list): list of gradients of a model
+
+    Returns:
+        (float): scalar product of the gradients
+    '''
     s = 0
     for g1, g2 in zip(l_grad1, l_grad2):
         s += (g1 * g2).sum()
