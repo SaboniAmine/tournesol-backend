@@ -20,6 +20,7 @@ Organisation:
 - main file is here
 - Data is handled in "handle_data.py"
 - ML model and decentralised structure are in "licchavi.py"
+- Licchavi is called in "core.py"
 
 Notations:
 - node = user : contributor

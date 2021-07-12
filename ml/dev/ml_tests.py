@@ -127,12 +127,12 @@ def test_distribute_data():
 # ============= wider tests =============
 
 def test_short_train():
-    
+    """ checks that outputs of training have normal length """
     nb_vids, nb_users, vids_per_user = 5, 3, 5
-    fake_data, glob_fake, loc_fake = generate_data( nb_vids, 
-                                                    nb_users, 
-                                                    vids_per_user,
-                                                    dens=0.999)
+    fake_data, _, _ = generate_data(    nb_vids, 
+                                        nb_users, 
+                                        vids_per_user,
+                                        dens=0.999)
     glob_scores, contributor_scores = ml_run (  fake_data,
                                                 1,
                                                 ["reliability"], 
@@ -140,4 +140,4 @@ def test_short_train():
                                                 verb=-1)
     assert nb_vids <= len(glob_scores) <= vids_per_user
     assert len(contributor_scores) == nb_users * vids_per_user
-                            
+              

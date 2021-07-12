@@ -20,6 +20,7 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
     comparison_data: output of fetch_data()
     criteria: str, rating criteria
     resume: bool, resume previous processing
+    
     Returns :   
     - (tensor of all vIDS , tensor of global video scores)
     - (list of tensor of local vIDs , list of tensors of local video scores)
@@ -47,9 +48,13 @@ def shape_train_predict(comparison_data, crit, epochs, resume, verb=2):
     return glob, loc, users_ids
 
 def ml_run(comparison_data, epochs, criterias, resume, verb=2):
-    """ Runs the ml algorithm for all CRITERIAS (global variable)
+    """ Runs the ml algorithm for all criterias
     
     comparison_data: output of fetch_data()
+    epochs (int): number of epochs of gradient descent for Licchavi
+    criterias (str list): list of criterias to compute
+    resume (bool): wether to resume from save or not
+    verb (int): verbosity level 
 
     Returns:
     - video_scores: list of [video_id: int, criteria_name: str, 
