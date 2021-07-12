@@ -15,7 +15,7 @@ from ml.licchavi import get_licchavi
 from ml.handle_data import select_criteria, shape_data
 from ml.handle_data import distribute_data, distribute_data_from_save
 from ml.handle_data import format_out_loc, format_out_glob
-from ml.experiments import run_experiment, licch_stats
+from ml.dev.experiments import run_experiment, licch_stats, scores_stats
 
 """
 Machine Learning main python file

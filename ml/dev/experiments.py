@@ -1,27 +1,17 @@
 from os import makedirs
 import torch
 
-<<<<<<< HEAD
 from ..data_utility import save_to_json, load_from_json
 from .plots import plot_metrics, plot_density
 from .visualisation import seedall, check_one, disp_one_by_line
 from .fake_data import generate_data
-from .tests import run_unittests
-=======
-from .plots import plot_metrics 
-from .data_utility import save_to_json, load_from_json
-from .visualisation import seedall, check_one, disp_one_by_line
->>>>>>> origin/master
+from .ml_tests import run_unittests
 
 """
 Not used in production, for testing only
 Module called from "ml_train.py" only if env var TOURNESOL_DEV is True
 
-<<<<<<< HEAD
 Used to perform some tests on ml algorithm (custom data, plots, ...)
-=======
-Used to perform some tests on ml algorithm (custom data, ...)
->>>>>>> origin/master
 """
 
 PATH_PLOTS = "ml/plots/"
@@ -29,7 +19,6 @@ makedirs(PATH_PLOTS, exist_ok=True)
 
 CRITERIAS = ["reliability"]
 TEST_DATA = [
-<<<<<<< HEAD
                 [1, 100, 101, "reliability", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
                 [1, 100, 101, "reliability", 100, 0],
@@ -59,38 +48,15 @@ NAME = ""
 EPOCHS = 2
 TRAIN = True 
 RESUME = False
-=======
-                [0, 100, 101, "reliability", 100, 0],
-                [0, 101, 110, "reliability", 0, 0],
-                [1, 100, 101, "importance", 100, 0],
-                [1, 100, 101, "reliability", 100, 0],
-                [1, 102, 103, "reliability", 70, 0],
-                [2, 104, 105, "reliability", 50, 0],
-                [3, 106, 107, "reliability", 30, 0],
-                [4, 108, 109, "reliability", 30, 0],
-                # [67, 200, 201, "reliability", 0, 0]
-            ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
-
-NAME = ""
-EPOCHS = 50
-TRAIN = True 
-RESUME = True
->>>>>>> origin/master
 
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
-<<<<<<< HEAD
-        from ..ml_train import ml_run
+        from ..management.commands.ml_train import ml_run
         seedall(4)
         run_unittests()
         #fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
         glob_scores, contributor_scores = ml_run(comparison_data[:10000],
-=======
-        seedall(4)
-        from .ml_train import ml_run
-        glob_scores, contributor_scores = ml_run(comparison_data[:10000], 
->>>>>>> origin/master
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
@@ -98,7 +64,6 @@ def run_experiment(comparison_data):
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
         glob_scores, contributor_scores = load_from_json(NAME)
-<<<<<<< HEAD
     for c in comparison_data:
         if c[3]=="largely_recommended":
             print(c)
@@ -114,23 +79,10 @@ def run_experiment(comparison_data):
 
 def licch_stats(licch):
     ''' gives some statistics about Licchavi object '''
-=======
-    for c in contributor_scores:
-        if c[0]==6213:
-            print(c)
-    disp_one_by_line(glob_scores[:10])
-    disp_one_by_line(contributor_scores[:10])
-    check_one(100, glob_scores, contributor_scores)
-    print("glob:", len(glob_scores), "local:",  len(contributor_scores))
-
-def licch_stats(licch):
-    ''' gives some statistics about licchavi object '''
->>>>>>> origin/master
     licch.check() # some tests
     h = licch.history
     print("nb_nodes", licch.nb_nodes)
     licch.stat_s()  # print stats on s parameters
-<<<<<<< HEAD
     with torch.no_grad():
         gen_s = licch.all_nodes("s")
         l_s = [s.item() for s in gen_s]
@@ -140,9 +92,6 @@ def licch_stats(licch):
                         "s_params.png")
     plot_metrics([h], path=PATH_PLOTS)
     # print("uncertainty", licch.uncert)
-=======
-    plot_metrics([h], path=PATH_PLOTS)
->>>>>>> origin/master
 
 def scores_stats(glob_scores):
     ''' gives statistics on global scores
@@ -154,8 +103,5 @@ def scores_stats(glob_scores):
                 torch.max(glob_scores).item() )
     print("minimax:", mini,maxi)
     print("variance of global scores :", var.item())
-<<<<<<< HEAD
     with torch.no_grad():
         plot_density(glob_scores, "Global scores", PATH_PLOTS, "scores.png")
-=======
->>>>>>> origin/master
