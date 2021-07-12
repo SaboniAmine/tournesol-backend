@@ -6,10 +6,11 @@ from ml.data_utility import rescale_rating, get_all_vids, get_mask
 from ml.data_utility import sort_by_first, reverse_idxs
 from ml.data_utility import expand_dic, expand_tens
 from ml.handle_data import select_criteria, shape_data, distribute_data
+from ml.losses import fbbt, hfbbt, fit_loss, s_loss
 
-from ml.dev.fake_data import generate_data, fake_comparisons, fake_glob_scores
-from ml.dev.fake_data import fake_loc_scores
+from ml.dev.fake_data import generate_data
 from ml.core import ml_run
+
 
 # """
 # Test module for ml
@@ -124,9 +125,41 @@ def test_distribute_data():
     assert len(user_ids) == len(nodes_dic) # number of users
     assert len(vid_vidx) == len(nodes_dic[0][0][0]) # total number of videos
 
+# ------------ losses.py ---------------------
+def test_fbbt_hfbbt():
+    l_t = [-2, -0.5, 0.001, 0.1, 0.3, 10, 50]
+    l_r = [-1, -0.8, -0.754, -0.2, -0.002, 0, 0.3, 0.564, 1]
+    for tt in l_t:
+        for rr in l_r:
+            t = torch.tensor(tt)
+            r = torch.tensor(rr)
+            assert abs(fbbt(t, r) - hfbbt(t,r)) <= 0.001
+
+def test_fit_loss():
+    l_s = [ 0.4, 0.5, 0.67, 0.88, 0.1, 1.2]
+    l_ya = [ 0.5, -0.2, 1.3, 3.4, -0.1, 0]
+    l_yb = [ 0.8, -1.2, -1.3, 0.34, 1.1, 0.5]
+    l_r = [0.2, 0.3, 0.4, -0.89, 0, 1]
+    results = [0.6715, 0.8845, 1.8526, -0.699, 0.6955, 0.1524]
+    for ss, yya, yyb, rr, res in zip(l_s, l_ya, l_yb, l_r, results):
+        s = torch.tensor(ss)
+        ya = torch.tensor(yya)
+        yb = torch.tensor(yyb)
+        r = torch.tensor(rr)
+        output = fit_loss(s, ya, yb, r).item()
+        assert abs(output - res) <= 0.001
+
+def test_s_loss():
+    l_s = [ 0.4, 0.5, 0.67, 0.88, 0.1, 1.2]
+    results = [0.9963, 0.8181, 0.6249, 0.515, 2.3076, 0.5377]
+    for ss, res in zip(l_s, results):
+        s = torch.tensor(ss)
+        output = s_loss(s).item()
+        assert abs(output - res) <= 0.001
+
 # ============= wider tests =============
 
-def test_short_train():
+def test_training_pipeline():
     """ checks that outputs of training have normal length """
     nb_vids, nb_users, vids_per_user = 5, 3, 5
     fake_data, _, _ = generate_data(    nb_vids, 
