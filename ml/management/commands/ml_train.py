@@ -122,7 +122,6 @@ def save_data(video_scores, contributor_rating_scores):
         for contributor_id, video_id, criteria, score, uncertainty 
         in contributor_rating_scores
     ])
-
     
 class Command(BaseCommand):
     help = 'Runs the ml'
