@@ -36,10 +36,6 @@ def scalar_product(l_grad1, l_grad2):
         s += (g1 * g2).sum()
     return round_loss(s, 4)
 
-def nb_params(model):
-    ''' returns number of parameters of a model '''
-    return sum(p.numel() for p in [model])
-
 def get_loc_models(nodes):
     ''' Returns a generator of all local models 
     
@@ -54,9 +50,10 @@ def get_loc_models(nodes):
 def replace_coordinate(tens, score, idx):
     """ Replaces one coordinate of the tensor
 
-    tens (float tensor): local model
-    score (scalar tensor): score to put in tens
-    idx (int): idx of score to replace
+    Args:
+        tens (float tensor): local model
+        score (scalar tensor): score to put in tens
+        idx (int): idx of score to replace
 
     Returns:
         (float tensor): same tensor as input but backward pointing to -score
@@ -71,13 +68,14 @@ def get_hessian_fun(nodes, general_model, fit_scale, gen_scale, pow_gen,
                           id_node, vidx):
     """ Gives loss in function of local model for hessian computation 
     
-    nodes (Node dictionnary): dictionnary of all nodes
-    general_model (float tensor): general model
-    fit_scale (float): importance of the local loss
-    gen_scale float): importance of the generalisation loss
-    pow_gen (float, float): distance used for generalisation
-    id_node (int): id of user
-    vidx (int): index of video, ie index of parameter
+    Args:
+        nodes (Node dictionnary): dictionnary of all nodes
+        general_model (float tensor): general model
+        fit_scale (float): importance of the local loss
+        gen_scale float): importance of the generalisation loss
+        pow_gen (float, float): distance used for generalisation
+        id_node (int): id of user
+        vidx (int): index of video, ie index of parameter
 
     Returns:
         (scalar tensor -> float) function giving loss according to one parameter 
@@ -102,12 +100,13 @@ def get_uncertainty(nodes, general_model, fit_scale,
                         gen_scale, pow_gen, vid_vidx):
     """ Returns uncertainty for all local scores (list of list of int) 
     
-    nodes (Node dictionnary): dictionnary of all nodes
-    general_model (float tensor): general model
-    fit_scale (float): importance of the local loss
-    gen_scale float): importance of the generalisation loss
-    pow_gen (float, float): distance used for generalisation
-    vid_vidx (dictionnary): {video ID: video index}
+    Args:
+        nodes (Node dictionnary): dictionnary of all nodes
+        general_model (float tensor): general model
+        fit_scale (float): importance of the local loss
+        gen_scale float): importance of the generalisation loss
+        pow_gen (float, float): distance used for generalisation
+        vid_vidx (dictionnary): {video ID: video index}
 
     Returns:
         (list of list of float): uncertainty for all local scores

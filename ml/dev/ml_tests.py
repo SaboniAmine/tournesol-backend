@@ -6,8 +6,10 @@ from ml.data_utility import rescale_rating, get_all_vids, get_mask
 from ml.data_utility import sort_by_first, reverse_idxs
 from ml.data_utility import expand_dic, expand_tens
 from ml.handle_data import select_criteria, shape_data, distribute_data
-from ml.losses import fbbt, hfbbt, fit_loss, s_loss
+from ml.losses import fbbt, hfbbt, fit_loss, s_loss, models_dist, model_norm
 from ml.metrics import extract_grad, scalar_product
+from ml.licchavi import get_licchavi, get_model
+from ml.hyperparameters import get_defaults
 
 from ml.dev.fake_data import generate_data
 from ml.core import ml_run
@@ -83,7 +85,8 @@ def test_expand_tens():
     output = expand_tens(tens, len2)
     assert len(output) == len1 + len2 # good final length
     # expanded with zeros and with gradient needed
-    assert ( output[len1 + 1:] == torch.zeros(len2, requires_grad=True) ).all()
+    assert (output[len1 + 1:] == torch.zeros(len2) ).all()
+    assert output.requires_grad
 
 def test_expand_dic():
     vid_vidx = {100:0, 200:2, 300:1}
@@ -159,17 +162,27 @@ def test_s_loss():
         assert abs(output - res) <= 0.001
 
 def test_models_dist():
-    pass #TODO
+    model1 = torch.tensor([1, 2, 4, 7])
+    model2 = torch.tensor([3, -2, -5, 9.2])
+    mask = torch.tensor([True, False, False, True])
+    assert models_dist(model1, model2) == 17.2
+    assert models_dist(model1, model2, mask=[mask]) == 4.2
 
 def test_model_norm():
-    pass #TODO
+    model = torch.tensor([1, 2, -4.4, 7])
+    assert model_norm(model) == 73.36
 
 # --------- licchavi.py ------------
 def test_get_model():
-    pass #TODO
+    model = get_model(6)
+    assert (model == torch.zeros(6)).all()
+    assert model.requires_grad
 
 def test_get_licchavi():
-    pass #TODO test hyperparameters for instance
+    licch = get_licchavi(0, {}, "reliability")
+    defaults = get_defaults()
+    for key, param in defaults.items():
+        assert getattr(licch, key) == param # check if default is applied
 
 # -------- metrics.py --------------
 def test_extract_grad():
@@ -202,4 +215,8 @@ def test_training_pipeline():
                                                 verb=-1)
     assert nb_vids <= len(glob_scores) <= vids_per_user
     assert len(contributor_scores) == nb_users * vids_per_user
+
+# ======= scores quality tests =============
+
+#TODO
               

@@ -101,10 +101,10 @@ def models_dist(model1, model2, pow=(1,1), mask=None):
         model1 (float tensor): scoring model
         model2 (float tensor): scoring model
         pow (float, float): (internal power, external power)
-        mask (bool tensor): subspace in which to compute distance
-
+        mask (bool tensor singleton): subspace in which to compute distance
+    #FIXME get rid of singleton
     Returns:
-        float: distance between the 2 models
+        (scalar float tensor): distance between the 2 models
     '''
     q, p = pow
     if mask is None: #FIXME dont use mask if None
@@ -123,7 +123,7 @@ def model_norm(model, pow=(2,1)):
         pow (float, float): (internal power, external power)
 
     Returns: 
-        float: norm of the model
+        (float scalar tensor): norm of the model
     '''
     q, p = pow
     norm = sum((param**q).abs().sum() for param in [model])**p
