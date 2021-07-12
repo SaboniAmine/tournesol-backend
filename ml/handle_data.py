@@ -30,7 +30,7 @@ def select_criteria(comparison_data, crit):
 def shape_data(l_ratings):
     ''' Shapes data for distribute_data()/distribute_data_from_save()
 
-    l_ratings : list of not None ratings for one criteria, all users
+    l_ratings : list of not None ratings ([0,100]) for one criteria, all users
 
     Returns : one array with 4 columns : userID, vID1, vID2, rating ([-1,1]) 
     '''

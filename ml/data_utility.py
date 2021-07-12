@@ -10,7 +10,6 @@ Main file is "ml_train.py"
 """
 
 
-# to handle data 
 def rescale_rating(rating):
     ''' rescales from [0,100] to [-1,1] float '''
     return rating / 50 - 1

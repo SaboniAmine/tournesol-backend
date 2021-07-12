@@ -51,7 +51,7 @@ RESUME = False
 def run_experiment(comparison_data):
     """ trains and outputs some stats """
     if TRAIN:
-        from ..management.commands.ml_train import ml_run
+        from ml.management.commands.ml_train import ml_run
         seedall(4)
         #fake_data, glob_fake, loc_fake = generate_data(5, 3, 5, dens=0.999)
         glob_scores, contributor_scores = ml_run(comparison_data[:10000],

@@ -118,9 +118,9 @@ def generate_data(nb_vid, nb_user, vids_per_user, dens=0.5):
     """
     distr = [vids_per_user] * nb_user
     glob = fake_glob_scores(nb_vid)
-    print(nb_vid, 'global scores generated')
+    # print(nb_vid, 'global scores generated')
     loc = fake_loc_scores(distr, glob, w=1)
-    print(vids_per_user, 'local scores generated per user')
+    # print(vids_per_user, 'local scores generated per user')
     comp = fake_comparisons(loc, dens)
-    print('comparisons generated')
+    # print('comparisons generated')
     return comp, glob, loc
