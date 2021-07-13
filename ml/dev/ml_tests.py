@@ -2,9 +2,8 @@ import numpy as np
 import torch
 import pytest
 
-from ml.data_utility import rescale_rating, get_all_vids, get_mask
-from ml.data_utility import sort_by_first, reverse_idxs
-from ml.data_utility import expand_dic, expand_tens
+from ml.data_utility import rescale_rating, get_all_vids, get_mask, reverse_idxs
+from ml.data_utility import sort_by_first, expand_dic, expand_tens
 from ml.handle_data import select_criteria, shape_data, distribute_data
 from ml.losses import fbbt, hfbbt, fit_loss, s_loss, models_dist, model_norm
 from ml.metrics import extract_grad, scalar_product
@@ -208,15 +207,65 @@ def test_training_pipeline():
                                         nb_users, 
                                         vids_per_user,
                                         dens=0.999)
+    # FIXME ml_run shouldnt save here for test
     glob_scores, contributor_scores = ml_run (  fake_data,
-                                                1,
-                                                ["reliability"], 
+                                                epochs=1,
+                                                criterias=["reliability"], 
                                                 resume=False, 
                                                 verb=-1)
     assert nb_vids <= len(glob_scores) <= vids_per_user
     assert len(contributor_scores) == nb_users * vids_per_user
 
 # ======= scores quality tests =============
+def id_score_assert(id, score, glob):
+    if glob[0] == id:
+        assert glob[3] == score
 
-#TODO
+def test_simple_train():
+    """ test coherency of results for few epochs and very light data """
+    comparison_data = [                      
+                        [1, 101, 102, "reliability", 100, 0],
+                        [2, 100, 101, "largely_recommended", 100, 0],
+                        [1, 104, 105, "reliability", 30, 0],
+                        [99, 100, 101, "largely_recommended", 100, 0],
+                        [2, 108, 107, "reliability", 10, 0],
+                        [0, 100, 102, "reliability", 70, 0],
+                        [0, 104, 105, "reliability", 70, 0],
+                        [0, 109, 110, "reliability", 50, 0],
+                        [2, 107, 108, "reliability", 10, 0],
+                        [1, 100, 101, "reliability", 100, 0],
+                        [3, 200, 201, "reliability", 85, 0],
+                        ]
+    # FIXME ml_run shouldnt save here for test
+    glob_scores, loc_scores = ml_run (  comparison_data,
+                                                epochs=2,
+                                                criterias=["reliability"], 
+                                                resume=False, 
+                                                verb=-1)
+    nb = [0, 0, 0, 0]
+    for loc in loc_scores:
+        assert loc[0] in [0, 1, 2, 3]
+        nb[loc[0]] += 1 # counting local scores
+    assert nb == [6, 5, 2, 2]
+    for glob in glob_scores:
+        id_score_assert(107, 0, glob)
+        id_score_assert(108, 0, glob)
+        id_score_assert(109, 0, glob)
+        id_score_assert(110, 0, glob)
+        if glob[0] == 102: # best rated video
+            best = glob[3]
+        if glob[0] == 100: # worst rated video
+            worst = glob[3]
+        if glob[0] == 200: # test symetric scores
+            sym = glob[3]
+    for glob in glob_scores:
+        assert worst <= glob[3] <= best
+        if glob[0] == 201:
+            assert glob[3] == -sym # test symetric scores
+
+def test_output_distribution():
+    """ trains for more epochs with more data, 
+    tests distribution at equilibrium
+    """
+    pass #TODO
               
