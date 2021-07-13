@@ -39,14 +39,14 @@ STYLES = get_style() # generator for looping styles
 COLORS = get_color()
 
 def title_save(title=None, path=None, suff=".png"):
-    ''' add title and save plot '''
+    ''' Adds title and saves plot '''
     if title is not None:   
         plt.title(title)
     if path is not None:
         plt.savefig(path + suff)
 
 def legendize(y, x="Epochs"):
-    ''' label axis of plt plot '''
+    ''' Labels axis of plt plot '''
     plt.xlabel(x)
     plt.ylabel(y)
     plt.legend()

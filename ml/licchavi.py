@@ -59,7 +59,7 @@ class Licchavi():
         vid_vidx: dictionnary of {vID: idx}
         crit: comparison criteria learnt
         '''
-        self.nb_params = nb_vids  # number of parameters of the model(= nb of videos)
+        self.nb_params = nb_vids  # number of parameters of the model
         self.vid_vidx = vid_vidx # {video ID : video index (for that criteria)}
         self.gpu = gpu # boolean for gpu usage (not implemented yet)
         self.criteria = crit # criteria learnt by this Licchavi
@@ -344,7 +344,8 @@ class Licchavi():
 
                 if verb >= 2:
                     total_out = round_loss(fit_loss + gen_loss + reg_loss)
-                    self._print_losses(total_out, fit_loss, gen_loss, reg_loss)           
+                    self._print_losses(total_out, fit_loss, s_loss, 
+                                        gen_loss, reg_loss)           
                 # Gradient descent 
                 loss.backward() 
                 self._do_step(fit_step)   

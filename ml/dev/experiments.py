@@ -42,7 +42,7 @@ TEST_DATA = [
 # nb_vids, nb_users, vids_per_user
 
 NAME = ""
-EPOCHS = 100
+EPOCHS = 2
 TRAIN = True 
 RESUME = False
 
