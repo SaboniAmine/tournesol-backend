@@ -3,7 +3,7 @@ from copy import deepcopy
 from time import time
 
 from .losses import model_norm, round_loss, models_dist
-from .losses import predict, loss_fit_gen, loss_gen_reg
+from .losses import predict, loss_fit_s_gen, loss_gen_reg
 from .metrics import extract_grad, scalar_product, get_uncertainty
 from .data_utility import expand_tens, one_hot_vids
 from .hyperparameters import get_defaults
@@ -83,9 +83,7 @@ class Licchavi():
 
         self.nb_nodes = 0
         self.nodes = {}
-
-        # self.size = nb_params(self.general_model) / 10_000
-        self.history = ([], [], [], [], [], [], []) # all metrics recording (not totally up to date)
+        self.history = ([], [], [], [], [], [], [], []) # metrics
   
     def set_params(self, **params):
         """ set training hyperparameters """
@@ -232,25 +230,26 @@ class Licchavi():
             node.opt.zero_grad()  # node optimizer 
         self.opt_gen.zero_grad() # general optimizer
 
-    def _update_hist(self, epoch, fit, gen, reg, verb=1):
+    def _update_hist(self, epoch, fit, s, gen, reg, verb=1):
         ''' updates history '''
         self.history[0].append(round_loss(fit))
-        self.history[1].append(round_loss(gen))
-        self.history[2].append(round_loss(reg))
+        self.history[1].append(round_loss(s))
+        self.history[2].append(round_loss(gen))
+        self.history[3].append(round_loss(reg))
 
         dist = models_dist(self.init_model, self.general_model, pow=(2,0.5)) 
         norm = model_norm(self.general_model, pow=(2,0.5))
-        self.history[3].append(round_loss(dist, 1))
-        self.history[4].append(round_loss(norm, 1))
+        self.history[4].append(round_loss(dist, 1))
+        self.history[5].append(round_loss(norm, 1))
         grad_gen = extract_grad(self.general_model)
         if epoch > 1: # no previous model for first epoch
             scal_grad = scalar_product(self.last_grad, grad_gen)
-            self.history[5].append(scal_grad)
+            self.history[6].append(scal_grad)
         else:
-            self.history[5].append(0) # default value for first epoch
+            self.history[6].append(0) # default value for first epoch
         self.last_grad = deepcopy(extract_grad(self.general_model)) 
         grad_norm = scalar_product(grad_gen, grad_gen)  #FIXME use sqrt ?
-        self.history[6].append(grad_norm)
+        self.history[7].append(grad_norm)
 
     def _old(self, years):
         ''' increments age of nodes (during training) '''
@@ -274,10 +273,11 @@ class Licchavi():
         else:
             self.opt_gen.step()  
 
-    def _print_losses(self, tot, fit, gen, reg):
+    def _print_losses(self, tot, fit, s, gen, reg):
         ''' prints losses '''
         print("total loss : ", tot) 
         print("fitting : ", round_loss(fit, 2),
+                ', s : ', round_loss(s, 2),
                 ', generalisation : ', round_loss(gen, 2),
                 ', regularisation : ', round_loss(reg, 2))
 
@@ -298,8 +298,8 @@ class Licchavi():
         self._set_lr()
 
         # initialisation to avoid undefined variables at epoch 1
-        loss, fit_loss, gen_loss, reg_loss = 0, 0, 0, 0
-        c_fit, c_gen = 0, 0
+        loss, fit_loss, s_loss, gen_loss, reg_loss = 0, 0, 0, 0, 0
+        c_fit, c_gen = 0, 0 #FIXME replace by modulo for readability
         
         fit_scale = 1 
         gen_scale = 1  # node weights are used in addition
@@ -323,13 +323,13 @@ class Licchavi():
                 #----------------    Licchavi loss  -------------------------
                  # only first 2 terms of loss updated
                 if fit_step:
-                    fit_loss, gen_loss = loss_fit_gen(  self.nodes,
-                                                        self.general_model,
-                                                        fit_scale,
-                                                        gen_scale,
-                                                        self.pow_gen
+                    fit_loss, s_loss, gen_loss = loss_fit_s_gen(   self.nodes,
+                                                            self.general_model,
+                                                            fit_scale,
+                                                            gen_scale,
+                                                            self.pow_gen
                                                         )
-                    loss = fit_loss + gen_loss
+                    loss = fit_loss + s_loss + gen_loss
                           
                 # only last 2 terms of loss updated 
                 else:        
@@ -349,7 +349,7 @@ class Licchavi():
                 loss.backward() 
                 self._do_step(fit_step)   
 
-            self._update_hist(epoch, fit_loss, gen_loss, reg_loss, verb)
+            self._update_hist(epoch, fit_loss, s_loss, gen_loss, reg_loss, verb)
             self._old(1)  # aging all nodes of 1 epoch
             if verb>=1: print("epoch time :", round(time() - time_ep, 2)) 
 

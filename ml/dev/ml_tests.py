@@ -5,7 +5,7 @@ import pytest
 from ml.data_utility import rescale_rating, get_all_vids, get_mask, reverse_idxs
 from ml.data_utility import sort_by_first, expand_dic, expand_tens
 from ml.handle_data import select_criteria, shape_data, distribute_data
-from ml.losses import fbbt, hfbbt, fit_loss, s_loss, models_dist, model_norm
+from ml.losses import fbbt, hfbbt, fit_loss, get_s_loss, models_dist, model_norm
 from ml.metrics import extract_grad, scalar_product
 from ml.licchavi import get_licchavi, get_model
 from ml.hyperparameters import get_defaults
@@ -152,12 +152,12 @@ def test_fit_loss():
         output = fit_loss(s, ya, yb, r).item()
         assert abs(output - res) <= 0.001
 
-def test_s_loss():
+def test_get_s_loss():
     l_s = [ 0.4, 0.5, 0.67, 0.88, 0.1, 1.2]
     results = [0.9963, 0.8181, 0.6249, 0.515, 2.3076, 0.5377]
     for ss, res in zip(l_s, results):
         s = torch.tensor(ss)
-        output = s_loss(s).item()
+        output = get_s_loss(s).item()
         assert abs(output - res) <= 0.001
 
 def test_models_dist():

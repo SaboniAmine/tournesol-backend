@@ -41,6 +41,7 @@ def hfbbt(t,r):
     Returns:
         float tensor: empirical loss for one comparison.
     '''
+    #FIXME doesnt allow batchs (performance issue)
     if abs(t) <= 0.01:
         return t**2 / 6 + r *t + torch.log(torch.tensor(2))
     elif abs(t) < 10:
@@ -63,8 +64,28 @@ def fit_loss(s, ya, yb, r):
     loss = hfbbt(s * (ya - yb), r)   
     return loss
 
-def s_loss(s):
-    ''' Second term of local loss (for one node) 
+def fit_loss_batch(model, s, a_batch, b_batch, r_batch):
+    """ Fitting loss for one node
+
+    Args:
+        model (float tensor): node local model.
+        s (float tensor): s parameter.
+        a_batch (bool 2D tensor): first videos compared by user.
+        b_batch (bool 2D tensor): second videos compared by user.
+        r_batch (float tensor): rating provided by user.
+
+    Returns:
+        (float scalar tensor): fitting loss.
+    """
+    ya_batch = predict(a_batch, model)
+    yb_batch = predict(b_batch, model)
+    loss = 0 
+    for ya, yb,r in zip(ya_batch, yb_batch, r_batch):
+        loss += fit_loss(s, ya, yb, r)
+    return loss
+
+def get_s_loss(s):
+    ''' Scaling loss for one node
     
     Args:
         s (float tensor): s parameter.
@@ -75,7 +96,7 @@ def s_loss(s):
     return (0.5 * s**2 - torch.log(s))
 
 def node_local_loss(model, s, a_batch, b_batch, r_batch):
-    ''' fitting loss for one node, includes s_loss 
+    ''' Local loss for one node
     
     Args:
         model (float tensor): node local model.
@@ -85,14 +106,11 @@ def node_local_loss(model, s, a_batch, b_batch, r_batch):
         r_batch (float tensor): rating provided by user.
 
     Returns:
-        float: node local loss.
+        (float tensor): node local loss.
     '''
-    ya_batch = predict(a_batch, model)
-    yb_batch = predict(b_batch, model)
-    loss = 0 
-    for ya,yb,r in zip(ya_batch, yb_batch, r_batch):
-        loss += fit_loss(s, ya, yb, r)
-    return loss + s_loss(s) #FIXME split in 2 functions
+    fitting_loss = fit_loss_batch(model, s, a_batch, b_batch, r_batch)
+    scaling_loss = get_s_loss(s)
+    return fitting_loss + scaling_loss
 
 def models_dist(model1, model2, pow=(1,1), mask=None):  
     ''' distance between 2 models (l1 by default)
@@ -137,7 +155,7 @@ def round_loss(tens, dec=0):
         return round(tens.item(), dec)
 
 # losses used in "licchavi.py"
-def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
+def loss_fit_s_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
     """ Computes local and generalisation terms of loss
     
     Args:
@@ -151,13 +169,14 @@ def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
         (float tensor): sum of local terms of loss
         (float tensor): generalisation term of loss
     """
-    fit_loss, gen_loss = 0, 0
+    fit_loss, s_loss, gen_loss = 0, 0, 0
     for node in nodes.values():  
-        fit_loss += node_local_loss(node.model, # local model
+        fit_loss += fit_loss_batch( node.model, # local model
                                     node.s,     # s
                                     node.vid1,  # id_batch1
                                     node.vid2,  # id_batch2
                                     node.r)     # r_batch
+        s_loss += get_s_loss(node.s)         
         g = models_dist(node.model,    # local model
                         general_model, # general model
                         pow_gen,       # norm
@@ -166,7 +185,7 @@ def loss_fit_gen(nodes, general_model, fit_scale, gen_scale, pow_gen):
         gen_loss +=  node.w * g  # node weight  * generalisation term
     fit_loss *= fit_scale
     gen_loss *= gen_scale
-    return fit_loss, gen_loss
+    return fit_loss, s_loss, gen_loss
 
 def loss_gen_reg(nodes, general_model, gen_scale, reg_scale, pow_gen, pow_reg):
     """ Computes generalisation and regularisation terms of loss

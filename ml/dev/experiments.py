@@ -39,12 +39,10 @@ TEST_DATA = [
             ] #+ [[0, 555, 556, "reliability", 40, 0]] * 10 
 
 
- 
-
 # nb_vids, nb_users, vids_per_user
 
 NAME = ""
-EPOCHS = 2
+EPOCHS = 100
 TRAIN = True 
 RESUME = False
 
@@ -58,7 +56,7 @@ def run_experiment(comparison_data):
                                                     EPOCHS,
                                                     CRITERIAS, 
                                                     RESUME,
-                                                    verb=1)
+                                                    verb=2)
         save_to_json(glob_scores, contributor_scores, NAME)
     else:
         glob_scores, contributor_scores = load_from_json(NAME)

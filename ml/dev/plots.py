@@ -13,13 +13,14 @@ Main file is "ml_train.py"
 
 INTENS = 0.4
 # tuple of dic of label, ordinate legend, filename
-METRICS = ({"lab":"fit", "ord": "Training Loss", "f_name": "loss"}, 
-           {"lab":"gen", "ord": "Training Loss", "f_name": "loss"}, 
-           {"lab":"reg", "ord": "Training Loss", "f_name": "loss"}, 
-           {"lab":"l2_dist", "ord": "l2 norm", "f_name": "l2dist"}, 
-           {"lab":"l2_norm", "ord": "l2 norm", "f_name": "l2dist"}, 
-           {"lab":"grad_sp", "ord": "Scalar Product", "f_name": "grad"}, 
-           {"lab":"grad_norm", "ord": "Scalar Product", "f_name": "grad"}
+METRICS = ( {"lab":"fit", "ord": "Training Loss", "f_name": "loss"}, 
+            {"lab":"s", "ord": "Training Loss", "f_name": "loss"}, 
+            {"lab":"gen", "ord": "Training Loss", "f_name": "loss"}, 
+            {"lab":"reg", "ord": "Training Loss", "f_name": "loss"}, 
+            {"lab":"l2_dist", "ord": "l2 norm", "f_name": "l2dist"}, 
+            {"lab":"l2_norm", "ord": "l2 norm", "f_name": "l2dist"}, 
+            {"lab":"grad_sp", "ord": "Scalar Product", "f_name": "grad"}, 
+            {"lab":"grad_norm", "ord": "Scalar Product", "f_name": "grad"}
            )
 
 def get_style():
@@ -44,9 +45,9 @@ def title_save(title=None, path=None, suff=".png"):
     if path is not None:
         plt.savefig(path + suff)
 
-def legendize(y):
+def legendize(y, x="Epochs"):
     ''' label axis of plt plot '''
-    plt.xlabel("Epochs")
+    plt.xlabel(x)
     plt.ylabel(y)
     plt.legend()
 
@@ -100,19 +101,19 @@ def plotfull_var(l_hist, l_idx, title=None, path=None, show=False):
 # ------- groups of metrics on a same plot -----------
 def loss_var(l_hist, title=None, path=None):
     ''' plot losses with variance from a list of historys '''
-    plotfull_var(l_hist, [0,1,2], title, path)
+    plotfull_var(l_hist, [0,1,2,3], title, path)
 
 def l2_var(l_hist, title=None, path=None):
     '''plot l2 norm of gen model from a list of historys'''
-    plotfull_var(l_hist, [3,4], title, path)
+    plotfull_var(l_hist, [4,5], title, path)
 
 def gradsp_var(l_hist, title=None, path=None):
     ''' plot scalar product of gradients between 2 consecutive epochs
         from a list of historys
     '''
-    plotfull_var(l_hist, [5,6], title, path)
+    plotfull_var(l_hist, [6,7], title, path)
 
-# plotting all metrics we have
+# plotting all the metrics we have
 def plot_metrics(l_hist, title=None, path=None):
     '''plot and save the different metrics from list of historys'''  
     loss_var(l_hist, title, path)
@@ -122,7 +123,7 @@ def plot_metrics(l_hist, title=None, path=None):
 # histogram
 def plot_density(tens, title=None, path=None, name="hist.png"):
     arr = np.asarray(tens)
-    _ = plt.hist(arr, density=False, bins=40)
-    legendize("density")
+    _ = plt.hist(arr, density=False, label=title, bins=40)
+    legendize("Number", "Value")
     title_save(title, path, name)
     plt.clf()

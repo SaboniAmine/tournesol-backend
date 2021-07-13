@@ -2,7 +2,7 @@ from torch.autograd.functional import hessian
 import torch
 from copy import deepcopy
 
-from .losses import round_loss, loss_fit_gen
+from .losses import round_loss, loss_fit_s_gen
 
 """
 Metrics used for training monitoring in "licchavi.py"
@@ -91,9 +91,9 @@ def get_hessian_fun(nodes, general_model, fit_scale, gen_scale, pow_gen,
 
         new_model = replace_coordinate(nodes[id_node].model, score, vidx)
         nodes[id_node].model = new_model
-        fit, gen =  loss_fit_gen(nodes, general_model, fit_scale, 
-                                gen_scale, pow_gen)
-        return fit + gen
+        fit_loss, s_loss, gen_loss =  loss_fit_s_gen(nodes, general_model, fit_scale, 
+                                    gen_scale, pow_gen)
+        return fit_loss + s_loss + gen_loss
     return get_loss
 
 def get_uncertainty(nodes, general_model, fit_scale, 
